@@ -24,10 +24,13 @@ import java.util.Map;
 
 public class Message implements Serializable {
     private static final long serialVersionUID = 8445773977080406428L;
-
+    /*消息所属主题*/
     private String topic;
+    /*消息标记*/
     private int flag;
+    /*拓展属性 tags：消息tag，用于消息过滤；keys：消息索引键，用空格隔开，根据这些key快速检索信息；waitStoreMsgOK：消息发送时是否等消息存储完成后再返回*/
     private Map<String, String> properties;
+    /*消息体*/
     private byte[] body;
     private String transactionId;
 

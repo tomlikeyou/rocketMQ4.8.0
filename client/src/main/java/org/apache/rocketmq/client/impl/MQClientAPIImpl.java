@@ -174,6 +174,9 @@ public class MQClientAPIImpl {
         System.setProperty(RemotingCommand.REMOTING_VERSION_KEY, Integer.toString(MQVersion.CURRENT_VERSION));
     }
 
+    /*客户端网络层对象， 管理客户端与 服务器之间 连接NioSocketChannel对象，通过它提供的 invoke系列方法，客户端与服务器进行远程调用
+    * 服务器 也可以直接调用 客户端
+    * */
     private final RemotingClient remotingClient;
     private final TopAddressing topAddressing;
     private final ClientRemotingProcessor clientRemotingProcessor;
@@ -185,10 +188,16 @@ public class MQClientAPIImpl {
         RPCHook rpcHook, final ClientConfig clientConfig) {
         this.clientConfig = clientConfig;
         topAddressing = new TopAddressing(MixAll.getWSAddr(), clientConfig.getUnitName());
+        /*创建 客户端网络层对象
+        * 参数1： 客户端网络层配置
+        * 参数2：null，客户端并不关系 channel event
+        * */
         this.remotingClient = new NettyRemotingClient(nettyClientConfig, null);
         this.clientRemotingProcessor = clientRemotingProcessor;
-
+        /*注册rpcHook*/
         this.remotingClient.registerRPCHook(rpcHook);
+
+        /*注册业务处理器*/
         this.remotingClient.registerProcessor(RequestCode.CHECK_TRANSACTION_STATE, this.clientRemotingProcessor, null);
 
         this.remotingClient.registerProcessor(RequestCode.NOTIFY_CONSUMER_IDS_CHANGED, this.clientRemotingProcessor, null);
@@ -236,6 +245,7 @@ public class MQClientAPIImpl {
     }
 
     public void start() {
+        /*客户端网络层启动*/
         this.remotingClient.start();
     }
 
@@ -418,6 +428,16 @@ public class MQClientAPIImpl {
 
     }
 
+    /*获取API对象，调用发送方法 完成发送
+     * 参数1：broker地址
+     * 参数2：brokerName
+     * 参数3：消息
+     * 参数4：SendMessageRequestHeader
+     * 参数5：剩余的超时限制
+     * 参数6：发送模式
+     * 参数7：context
+     * 参数8：生产者对象
+     * */
     public SendResult sendMessage(
         final String addr,
         final String brokerName,
@@ -428,9 +448,37 @@ public class MQClientAPIImpl {
         final SendMessageContext context,
         final DefaultMQProducerImpl producer
     ) throws RemotingException, MQBrokerException, InterruptedException {
+        /*
+         * 参数1：broker地址
+         * 参数2：brokerName
+         * 参数3：消息
+         * 参数4：SendMessageRequestHeader
+         * 参数5：剩余的超时限制
+         * 参数6：发送模式
+         * 参数7：回调处理对象（同步这里为null）
+         * 参数8：主题发布信息（这里为null）
+         * 参数9：客户端实例
+         * 参数10：重试次数（0）
+         * 参数11：context
+         * 参数12：生产者对象
+         * */
         return sendMessage(addr, brokerName, msg, requestHeader, timeoutMillis, communicationMode, null, null, null, 0, context, producer);
     }
 
+    /*
+     * 参数1：broker地址
+     * 参数2：brokerName
+     * 参数3：消息
+     * 参数4：SendMessageRequestHeader
+     * 参数5：剩余的超时限制
+     * 参数6：发送模式
+     * 参数7：回调处理对象（同步这里为null）
+     * 参数8：主题发布信息（这里为null）
+     * 参数9：客户端实例
+     * 参数10：重试次数（0）
+     * 参数11：context
+     * 参数12：生产者对象
+     * */
     public SendResult sendMessage(
         final String addr,
         final String brokerName,
@@ -458,12 +506,14 @@ public class MQClientAPIImpl {
             }
         } else {
             if (sendSmartMsg || msg instanceof MessageBatch) {
+                /*将 SendMessageRequestHeader 转换为 SendMessageRequestHeaderV2*/
                 SendMessageRequestHeaderV2 requestHeaderV2 = SendMessageRequestHeaderV2.createSendMessageRequestHeaderV2(requestHeader);
                 request = RemotingCommand.createRequestCommand(msg instanceof MessageBatch ? RequestCode.SEND_BATCH_MESSAGE : RequestCode.SEND_MESSAGE_V2, requestHeaderV2);
             } else {
                 request = RemotingCommand.createRequestCommand(RequestCode.SEND_MESSAGE, requestHeader);
             }
         }
+        /*将消息体 放到网络传输层对象 body中*/
         request.setBody(msg.getBody());
 
         switch (communicationMode) {
@@ -480,10 +530,12 @@ public class MQClientAPIImpl {
                     retryTimesWhenSendFailed, times, context, producer);
                 return null;
             case SYNC:
+                /*当前耗时，如果已经超过发送时间限制，抛出异常*/
                 long costTimeSync = System.currentTimeMillis() - beginStartTime;
                 if (timeoutMillis < costTimeSync) {
                     throw new RemotingTooMuchRequestException("sendMessage call timeout");
                 }
+                /*进行同步调用，将消息传递到 broker，broker完成存储后 或者其他情况 都会返回*/
                 return this.sendMessageSync(addr, brokerName, msg, timeoutMillis - costTimeSync, request);
             default:
                 assert false;

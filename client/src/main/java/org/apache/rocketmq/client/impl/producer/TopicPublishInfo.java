@@ -26,8 +26,10 @@ import org.apache.rocketmq.common.protocol.route.TopicRouteData;
 public class TopicPublishInfo {
     private boolean orderTopic = false;
     private boolean haveTopicRouterInfo = false;
+    /*主题全部的队列信息*/
     private List<MessageQueue> messageQueueList = new ArrayList<MessageQueue>();
     private volatile ThreadLocalIndex sendWhichQueue = new ThreadLocalIndex();
+    /*主题路由数据*/
     private TopicRouteData topicRouteData;
 
     public boolean isOrderTopic() {
@@ -66,6 +68,11 @@ public class TopicPublishInfo {
         this.haveTopicRouterInfo = haveTopicRouterInfo;
     }
 
+    /*
+    * 默认选择队列的方法
+    * 参数：上次失败的 brokerName（可以为null）
+    * 返回值：当前主题下的一个队列
+    * */
     public MessageQueue selectOneMessageQueue(final String lastBrokerName) {
         if (lastBrokerName == null) {
             return selectOneMessageQueue();

@@ -126,15 +126,15 @@ public class RouteInfoManager {
         try {
             try {
                 this.lock.writeLock().lockInterruptibly();
-                /*获取broker所属的集群信息*/
+                /*获取当前集群上的broker列表*/
                 Set<String> brokerNames = this.clusterAddrTable.get(clusterName);
                 /*先判断broker所属集群是否存在，不存在则新建一个集群*/
                 if (null == brokerNames) {
                     brokerNames = new HashSet<String>();
-                    /*添加一个集群*/
+                    /*添加一个集群，key是集群名称，value是集群内的broker名称*/
                     this.clusterAddrTable.put(clusterName, brokerNames);
                 }
-                // 将当前broker加入到 集群中
+                // 将当前broker加入到 集群set中
                 brokerNames.add(brokerName);
 
                 // true：代表broker是否是第一次向namesrv注册，反之不是
@@ -144,9 +144,9 @@ public class RouteInfoManager {
                 /*条件成立：表明当前broker是第一次向namesrv发送心跳包 注册broker*/
                 if (null == brokerData) {
                     registerFirst = true;
-                    // 创建一个broker信息对象
+                    // 创建一个broker信息对象 BrokerData
                     brokerData = new BrokerData(clusterName, brokerName, new HashMap<Long, String>());
-                    // 将broker信息 保存到broker信息表当中，key：broker名称，value：broker信息
+                    // 将broker信息 保存到broker信息映射表表当中，key：broker名称，value：broker信息 BrokerData
                     this.brokerAddrTable.put(brokerName, brokerData);
                 }
                 /*获取brokerData的地址信息集合，一个broker可能会是主从模式*/
@@ -182,7 +182,7 @@ public class RouteInfoManager {
                     }
                 }
 
-                /*更新brokerLiveTable broker状态信息表，返回上一次物理节点的broker的 BrokerLiveInfo 信息*/
+                /*更新brokerLiveTable broker状态信息表，返回上一次物理节点的broker的 BrokerLiveInfo信息；定时任务会扫描这个映射表*/
                 BrokerLiveInfo prevBrokerLiveInfo = this.brokerLiveTable.put(brokerAddr,
                     new BrokerLiveInfo(
                         System.currentTimeMillis(),
@@ -202,7 +202,7 @@ public class RouteInfoManager {
                 }
 
                 if (MixAll.MASTER_ID != brokerId) {
-                    // 执行到这里，说明当前brokerID！=0
+                    // 执行到这里，说明当前brokerId！=0
 
                     // 获取broker主节点 物理地址
                     String masterAddr = brokerData.getBrokerAddrs().get(MixAll.MASTER_ID);

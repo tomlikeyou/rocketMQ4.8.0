@@ -77,9 +77,9 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
     private final ExecutorService publicExecutor;
     // HouseKeepingService... BrokerHouseKeepingService(Nameserver使用)，ClientHouseKeepingService( broker使用)
     private final ChannelEventListener channelEventListener;
-    // 定时器，执行 scanResponseTable 任务
+    // 定时器，执行 scanResponseTable 定时任务
     private final Timer timer = new Timer("ServerHouseKeepingService", true);
-    // 当向 channel pipeline 添加了 handler时 指定了group时，网络事件传播到当前 handler时， 事件处理由 分配当前handler的线程执行
+    // 当向 channel pipeline 添加了 handler时 指定了group时，网络事件传播到当前 handler时， 事件处理由 分配给当前handler的线程执行
     private DefaultEventExecutorGroup defaultEventExecutorGroup;
 
     // 服务器绑定的端口号
@@ -216,7 +216,7 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
             this.serverBootstrap.group(this.eventLoopGroupBoss, this.eventLoopGroupSelector)
                     // 设置服务端 ServerSocketChannel 类型
                 .channel(useEpoll() ? EpollServerSocketChannel.class : NioServerSocketChannel.class)
-                    // 设置服务端参数选项
+                    // 设置服务端channel参数选项
                 .option(ChannelOption.SO_BACKLOG, 1024)
                 .option(ChannelOption.SO_REUSEADDR, true)
                 .option(ChannelOption.SO_KEEPALIVE, false)
@@ -328,7 +328,7 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
         }
         //pair 第一个参数，业务处理器，第二个参数：线程池
         Pair<NettyRequestProcessor, ExecutorService> pair = new Pair<NettyRequestProcessor, ExecutorService>(processor, executorThis);
-        //key：业务代码; value：pair
+        //key：业务代码  value：pair
         this.processorTable.put(requestCode, pair);
     }
 

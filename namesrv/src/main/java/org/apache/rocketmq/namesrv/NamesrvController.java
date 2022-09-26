@@ -56,7 +56,8 @@ public class NamesrvController {
 
     //网络层封装对象，重要
     private RemotingServer remotingServer;
-    // ChannelEventListener ,用于监听channel状态，当channel状态发生改变时， close,idle...会向事件队列发起事件，事件最终由 该service处理
+
+    // ChannelEventListener ,用于监听channel状态，当channel状态发生改变时， close,idle... 会向 事件队列发起事件，事件最终由 该service处理
     private BrokerHousekeepingService brokerHousekeepingService;
     // 业务线程池，netty线程主要任务是 解析报文， 将报文解析成 RemotingCommand 对象，然后就将该对象交给 业务线程池 再处理
     private ExecutorService remotingExecutor;
@@ -96,7 +97,7 @@ public class NamesrvController {
         //注册协议处理器（缺省协议处理器）
         this.registerProcessor();
 
-        //定时任务1，namesrv每隔10s 检查broker上一个心跳包与当前系统时间的时间戳，如果时间戳大于120s，则移除该broker信息
+        //定时任务1，namesrv每隔10s 检查broker 上一个心跳包与当前系统时间的时间戳，如果时间戳大于120s，则移除该broker信息
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override

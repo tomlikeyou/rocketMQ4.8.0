@@ -114,6 +114,7 @@ public abstract class NettyRemotingAbstract {
      * @param permitsAsync Number of permits for asynchronous requests.
      */
     public NettyRemotingAbstract(final int permitsOneway, final int permitsAsync) {
+        /*创建两个信号量*/
         this.semaphoreOneway = new Semaphore(permitsOneway, true);
         this.semaphoreAsync = new Semaphore(permitsAsync, true);
     }
@@ -215,9 +216,8 @@ public abstract class NettyRemotingAbstract {
                                 doAfterRpcHooks(RemotingHelper.parseChannelRemoteAddr(ctx.channel()), cmd, response);
                                 // 条件成立，说明客户端发来的请求 是需要结果的
                                 if (!cmd.isOnewayRPC()) {
-
                                     if (response != null) {
-                                        // 将请求ID 设置到 response,opaque中，客户端根据opaque值 在responseFutureTable找到 responseFuture 完成结果的交互
+                                        // 将请求ID 设置到 response.opaque中，客户端根据opaque值 在responseFutureTable找到 responseFuture 完成结果的交互
                                         response.setOpaque(opaque);
                                         // 设置当前请求 是 响应类型
                                         response.markResponseType();
@@ -234,7 +234,7 @@ public abstract class NettyRemotingAbstract {
                                 }
                             }
                         };
-                        // nameserver 使用的是 DefaultRequestProcessor， 是一个 AsyncNettyRequestProcessor 子类
+                        // nameserver 使用的是 缺省的处理器 DefaultRequestProcessor， 是一个 AsyncNettyRequestProcessor 子类
                         if (pair.getObject1() instanceof AsyncNettyRequestProcessor) {
                             // DefaultRequestProcessor
                             AsyncNettyRequestProcessor processor = (AsyncNettyRequestProcessor)pair.getObject1();
@@ -310,6 +310,7 @@ public abstract class NettyRemotingAbstract {
         final int opaque = cmd.getOpaque();
         final ResponseFuture responseFuture = responseTable.get(opaque);
         if (responseFuture != null) {
+            /*设置客户端 cmd */
             responseFuture.setResponseCommand(cmd);
             // 将 responseFuture 从 映射表移除
             responseTable.remove(opaque);
@@ -435,12 +436,12 @@ public abstract class NettyRemotingAbstract {
         final int opaque = request.getOpaque();
 
         try {
-            //参数1：channel
-            // 参数2：请求ID，
+            //参数1：客户端channel
+            // 参数2：请求ID
             // 参数3：超时时间
             final ResponseFuture responseFuture = new ResponseFuture(channel, opaque, timeoutMillis, null, null);
             // 加入到映射表
-            // key: opaque, value:
+            // key: opaque, value: responseFuture
             this.responseTable.put(opaque, responseFuture);
             // 获取客户端 地址信息
             final SocketAddress addr = channel.remoteAddress();
@@ -467,6 +468,7 @@ public abstract class NettyRemotingAbstract {
             });
             // 业务线程 在这里进入 挂起状态了...
             RemotingCommand responseCommand = responseFuture.waitResponse(timeoutMillis);
+
             // 线程执行到这里，有两种情况
             // 1.正常情况，客户端返回数据了，io线程将业务线程唤醒
             //2. 超时
@@ -488,9 +490,9 @@ public abstract class NettyRemotingAbstract {
     }
     /**
      * 参数1：客户端channel
-     *      * 参数2：网络请求对象 remotingCommand
-     *      * 参数3：超时时长
-     *      * 参数4：请求结果 回调处理对象
+     *参数2：网络请求对象 remotingCommand
+     *参数3：超时时长
+     *参数4：请求结果 回调处理对象
      * */
     public void invokeAsyncImpl(final Channel channel, final RemotingCommand request, final long timeoutMillis,
         final InvokeCallback invokeCallback)
@@ -568,7 +570,7 @@ public abstract class NettyRemotingAbstract {
             responseFuture.setSendRequestOK(false);
             responseFuture.putResponse(null);
             try {
-                // 调用回调处理器对象， 异步使用 CallbackExecutor
+                // 调用回调处理器对象， 异步使用 CallbackExecutor，公共线程池
                 executeInvokeCallback(responseFuture);
             } catch (Throwable e) {
                 log.warn("execute callback in requestFail, and callback throw", e);
@@ -599,11 +601,11 @@ public abstract class NettyRemotingAbstract {
         throws InterruptedException, RemotingTooMuchRequestException, RemotingTimeoutException, RemotingSendRequestException {
         // 设置标记，对端 检查标记，就可以知道 这个请求 是一个单向请求.
         request.markOnewayRPC();
-
+        /*申请信号量*/
         boolean acquired = this.semaphoreOneway.tryAcquire(timeoutMillis, TimeUnit.MILLISECONDS);
 
         if (acquired) {
-            // 释放信号量逻辑封装对象
+            /*释放信号量逻辑封装对象*/
             final SemaphoreReleaseOnlyOnce once = new SemaphoreReleaseOnlyOnce(this.semaphoreOneway);
             try {
                 // 1.将数据交给 channel 这里数据发送的逻辑 由 netty线程完成。

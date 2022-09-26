@@ -96,10 +96,11 @@ public class NamesrvStartup {
             //读取 -c选项的值
             String file = commandLine.getOptionValue('c');
             if (file != null) {
-                //读取 config文件数据 到properties 内
+                //读取 config文件数据 到properties内
                 InputStream in = new BufferedInputStream(new FileInputStream(file));
                 properties = new Properties();
                 properties.load(in);
+
                 //如果config配置文件 内的配置 涉及到了 namesrvConfig 或者 nettyServerConfig 的字段，那么进行复写
                 MixAll.properties2Object(properties, namesrvConfig);
                 MixAll.properties2Object(properties, nettyServerConfig);
@@ -117,6 +118,7 @@ public class NamesrvStartup {
             MixAll.printObjectProperties(console, nettyServerConfig);
             System.exit(0);
         }
+
         //将启动时候命令行 设置的kv 复写到namesrvConfig内
         MixAll.properties2Object(ServerUtil.commandLine2Properties(commandLine), namesrvConfig);
 
@@ -130,7 +132,6 @@ public class NamesrvStartup {
         configurator.setContext(lc);
         lc.reset();
         configurator.doConfigure(namesrvConfig.getRocketmqHome() + "/conf/logback_namesrv.xml");
-
         log = InternalLoggerFactory.getLogger(LoggerName.NAMESRV_LOGGER_NAME);
 
         MixAll.printObjectProperties(log, namesrvConfig);

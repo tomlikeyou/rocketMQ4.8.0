@@ -23,9 +23,9 @@ public class NettyServerConfig implements Cloneable {
     private int serverWorkerThreads = 8;
     // 根据该值 创建 remotingServer 内部的 publicExecutor
     private int serverCallbackExecutorThreads = 0;
-    // netty worker 线程数
+    // netty worker 组线程数
     private int serverSelectorThreads = 3;
-    // 服务端单向访问客户端时候 并发限制
+    // 服务端 单向访问 客户端时候 并发限制
     private int serverOnewaySemaphoreValue = 256;
     // 服务端 异步访问 客户端时 的并发限制数
     private int serverAsyncSemaphoreValue = 64;
@@ -33,7 +33,7 @@ public class NettyServerConfig implements Cloneable {
     private int serverChannelMaxIdleTimeSeconds = 120;
     // 写缓冲区大小，默认65535，64KB
     private int serverSocketSndBufSize = NettySystemConfig.socketSndbufSize;
-    // 接缓冲区大小，默认65535，64KB
+    // 接收缓冲区大小，默认65535，64KB
     private int serverSocketRcvBufSize = NettySystemConfig.socketRcvbufSize;
     // 是否启用 netty内存池，默认开启。
     private boolean serverPooledByteBufAllocatorEnable = true;

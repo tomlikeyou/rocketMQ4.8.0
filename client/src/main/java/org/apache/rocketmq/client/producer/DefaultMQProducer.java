@@ -55,6 +55,11 @@ import org.apache.rocketmq.remoting.exception.RemotingException;
  * <p> <strong>Thread Safety:</strong> After configuring and starting process, this class can be regarded as thread-safe
  * and used among multiple threads context. </p>
  */
+
+/**
+ * 业务层使用对象，业务层使用它完成消息发送
+ * 管理配置信息
+ */
 public class DefaultMQProducer extends ClientConfig implements MQProducer {
 
     /**
@@ -70,26 +75,31 @@ public class DefaultMQProducer extends ClientConfig implements MQProducer {
      *
      * See {@linktourl http://rocketmq.apache.org/docs/core-concept/} for more discussion.
      */
+    /*生产者组（发送事务消息，broker端进行事务回查时，可以选择当前 生产者组下的任意一个生产者 进行事务回查）*/
     private String producerGroup;
 
     /**
      * Just for testing or demo program
      */
+    /*TBW102: broker写死的主题队列信息，当发送信息指定的topic 在namesrv 未找到路由信息，则使用TBW102 作为模板 去创建 主题发布信息*/
     private String createTopicKey = TopicValidator.AUTO_CREATE_TOPIC_KEY_TOPIC;
 
     /**
      * Number of queues to create per default topic.
      */
+    /*默认broker每个主题 创建的 队列数*/
     private volatile int defaultTopicQueueNums = 4;
 
     /**
      * Timeout for sending messages.
      */
+    /*发送消息超时时间，默认3s*/
     private int sendMsgTimeout = 3000;
 
     /**
      * Compress message body threshold, namely, message body larger than 4k will be compressed on default.
      */
+    /*压缩值：当msg body 大小超过 4k后，选择使用压缩*/
     private int compressMsgBodyOverHowmuch = 1024 * 4;
 
     /**
@@ -97,6 +107,7 @@ public class DefaultMQProducer extends ClientConfig implements MQProducer {
      *
      * This may potentially cause message duplication which is up to application developers to resolve.
      */
+    /*同步发送消息失败后 重试发送次数：2，再加上第一次发送次数==3*/
     private int retryTimesWhenSendFailed = 2;
 
     /**
@@ -104,16 +115,19 @@ public class DefaultMQProducer extends ClientConfig implements MQProducer {
      *
      * This may potentially cause message duplication which is up to application developers to resolve.
      */
+    /*异步发送消息失败后 重试发送次数：2*/
     private int retryTimesWhenSendAsyncFailed = 2;
 
     /**
      * Indicate whether to retry another broker on sending failure internally.
      */
+    /*消息未存储成功，是否选择其他broker节点进行消息重试？ 一般需要设置为true*/
     private boolean retryAnotherBrokerWhenNotStoreOK = false;
 
     /**
      * Maximum allowed message size in bytes.
      */
+    /*消息体 最大限制 4MB*/
     private int maxMessageSize = 1024 * 1024 * 4; // 4M
 
     /**
@@ -203,6 +217,10 @@ public class DefaultMQProducer extends ClientConfig implements MQProducer {
     public DefaultMQProducer(final String namespace, final String producerGroup, RPCHook rpcHook) {
         this.namespace = namespace;
         this.producerGroup = producerGroup;
+        /*创建生产者实现对象
+        * 参数1：生产者门面对象
+        * 参数2：rpchook
+        * */
         defaultMQProducerImpl = new DefaultMQProducerImpl(this, rpcHook);
     }
 
@@ -268,6 +286,7 @@ public class DefaultMQProducer extends ClientConfig implements MQProducer {
      */
     @Override
     public void start() throws MQClientException {
+        /*重置生产者组名：规则：如果设置了命名空间，则namespace%group*/
         this.setProducerGroup(withNamespace(this.producerGroup));
         this.defaultMQProducerImpl.start();
         if (null != traceDispatcher) {

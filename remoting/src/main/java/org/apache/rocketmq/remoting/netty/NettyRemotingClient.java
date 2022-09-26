@@ -73,12 +73,19 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
 
     private static final long LOCK_TIMEOUT_MILLIS = 3000;
 
+    /*客户端网络层配置*/
     private final NettyClientConfig nettyClientConfig;
+    /*客户端网络层 启动对象，通过它 bootstrap.connect(addr) => NioSocketChannel 接下来使用 这个channel 就可以和 对端完成通信*/
     private final Bootstrap bootstrap = new Bootstrap();
+    /*客户端网络层 netty  IO线程组*/
     private final EventLoopGroup eventLoopGroupWorker;
+
     private final Lock lockChannelTables = new ReentrantLock();
+    /*channel 映射表，key：服务器地址，value：客户端与服务器 channel封装对象*/
     private final ConcurrentMap<String /* addr */, ChannelWrapper> channelTables = new ConcurrentHashMap<String, ChannelWrapper>();
 
+
+    /*定时器*/
     private final Timer timer = new Timer("ClientHouseKeepingService", true);
 
     private final AtomicReference<List<String>> namesrvAddrList = new AtomicReference<List<String>>();
@@ -86,13 +93,17 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
     private final AtomicInteger namesrvIndex = new AtomicInteger(initValueIndex());
     private final Lock lockNamesrvChannel = new ReentrantLock();
 
+    /*公共线程池*/
     private final ExecutorService publicExecutor;
 
     /**
      * Invoke the callback methods in this executor when process response.
      */
+    /*回调处理线程池，客户端发起异步请求， 服务器响应数据， 由回调处理线程池处理*/
     private ExecutorService callbackExecutor;
+    /*客户端这里是 null*/
     private final ChannelEventListener channelEventListener;
+    /* channel pipeline 内的handler 使用的线程资源*/
     private DefaultEventExecutorGroup defaultEventExecutorGroup;
 
     public NettyRemotingClient(final NettyClientConfig nettyClientConfig) {
@@ -101,6 +112,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
 
     public NettyRemotingClient(final NettyClientConfig nettyClientConfig,
         final ChannelEventListener channelEventListener) {
+        /*父类 创建两个信号量，1 控制单向请求并发度，2控制异步请求并发度*/
         super(nettyClientConfig.getClientOnewaySemaphoreValue(), nettyClientConfig.getClientAsyncSemaphoreValue());
         this.nettyClientConfig = nettyClientConfig;
         this.channelEventListener = channelEventListener;
@@ -118,7 +130,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
                 return new Thread(r, "NettyClientPublicExecutor_" + this.threadIndex.incrementAndGet());
             }
         });
-
+        /*创建netty IO线程池，注意1个线程*/
         this.eventLoopGroupWorker = new NioEventLoopGroup(1, new ThreadFactory() {
             private AtomicInteger threadIndex = new AtomicInteger(0);
 
@@ -149,6 +161,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
 
     @Override
     public void start() {
+        /* channel pipeline 内的handler 使用的线程资源*/
         this.defaultEventExecutorGroup = new DefaultEventExecutorGroup(
             nettyClientConfig.getClientWorkerThreads(),
             new ThreadFactory() {
@@ -160,7 +173,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
                     return new Thread(r, "NettyClientWorkerThread_" + this.threadIndex.incrementAndGet());
                 }
             });
-
+        /*配置 netty客户端启动类对象*/
         Bootstrap handler = this.bootstrap.group(this.eventLoopGroupWorker).channel(NioSocketChannel.class)
             .option(ChannelOption.TCP_NODELAY, true)
             .option(ChannelOption.SO_KEEPALIVE, false)
@@ -188,7 +201,9 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
                         new NettyClientHandler());
                 }
             });
+        /*注意  bootstrap仅仅是配置好 客户端 数据了，并没有创建任何channel对象*/
 
+        /*定时扫描 responseFutureTable 中超时的 ResponseFuture对象 避免客户端线程 长时间 阻塞*/
         this.timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
@@ -362,19 +377,39 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
         }
     }
 
+    /**
+     *
+     * @param addr 服务端地址
+     * @param request 网络层传输对象（封装着请求数据）
+     * @param timeoutMillis 超时时间限制
+     */
     @Override
     public RemotingCommand invokeSync(String addr, final RemotingCommand request, long timeoutMillis)
         throws InterruptedException, RemotingConnectException, RemotingSendRequestException, RemotingTimeoutException {
+        /*开始时间*/
         long beginStartTime = System.currentTimeMillis();
+        /*获取 或者 创建  客户端与服务端(addr)的 通道channle*/
         final Channel channel = this.getAndCreateChannel(addr);
+
+        /*条件成立：说明客户端 与服务端 channel 通道正常，可以通信*/
         if (channel != null && channel.isActive()) {
             try {
+                /*执行 rpc before Hook，属于框架留给用户的拓展点*/
                 doBeforeRpcHooks(addr, request);
+                /*计算耗时时间*/
                 long costTime = System.currentTimeMillis() - beginStartTime;
+                /*如果当前耗时时间 已经超过 timeoutMillis限制了，就不再进行通信*/
                 if (timeoutMillis < costTime) {
                     throw new RemotingTimeoutException("invokeSync call timeout");
                 }
+                /*
+                * 参数1：channel通道
+                * 参数2：网络层传输对象（封装着请求数据）
+                * 参数3：剩余超时时间限制
+                * 返回值：服务端 响应数据
+                * */
                 RemotingCommand response = this.invokeSyncImpl(channel, request, timeoutMillis - costTime);
+                /*执行rpc After Hook方法*/
                 doAfterRpcHooks(RemotingHelper.parseChannelRemoteAddr(channel), request, response);
                 return response;
             } catch (RemotingSendRequestException e) {
@@ -511,10 +546,18 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
         return null;
     }
 
+    /**
+     *
+     * @param addr 服务端地址
+     * @param request 网络层传输对象（封装着请求数据）
+     * @param timeoutMillis 超时时间限制
+     * @param invokeCallback 请求结果， 回调处理对象
+     */
     @Override
     public void invokeAsync(String addr, RemotingCommand request, long timeoutMillis, InvokeCallback invokeCallback)
         throws InterruptedException, RemotingConnectException, RemotingTooMuchRequestException, RemotingTimeoutException,
         RemotingSendRequestException {
+        /*获取开始时间*/
         long beginStartTime = System.currentTimeMillis();
         final Channel channel = this.getAndCreateChannel(addr);
         if (channel != null && channel.isActive()) {

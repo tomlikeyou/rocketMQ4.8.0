@@ -286,7 +286,7 @@ public class DefaultRequestProcessor extends AsyncNettyRequestProcessor implemen
     // 参数2：request，客户端发送的 网络层请求对象  RemotingCommand
     public RemotingCommand registerBroker(ChannelHandlerContext ctx,
         RemotingCommand request) throws RemotingCommandException {
-        // 创建响应请求的对象 ，大概清除 response.customHeader 是一个 RegisterBrokerResponseHeader 实例对象
+        // 创建响应请求的对象 ，大概清楚 response.customHeader 是一个 RegisterBrokerResponseHeader 实例对象
         final RemotingCommand response = RemotingCommand.createResponseCommand(RegisterBrokerResponseHeader.class);
         // 获取出 刚刚反射创建出的 RegisterBrokerResponseHeader 用户自定义的 header对象
         final RegisterBrokerResponseHeader responseHeader = (RegisterBrokerResponseHeader) response.readCustomHeader();

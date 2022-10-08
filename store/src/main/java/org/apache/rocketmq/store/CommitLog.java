@@ -609,16 +609,21 @@ public class CommitLog {
      * @param msg （消息）
      */
     public CompletableFuture<PutMessageResult> asyncPutMessage(final MessageExtBrokerInner msg) {
+        /*设置个存储时间，后面获取到 写锁后 这个时间会被重写*/
         // Set the storage time
         msg.setStoreTimestamp(System.currentTimeMillis());
+
+        /*计算body crc值*/
         // Set the message body BODY CRC (consider the most appropriate setting
         // on the client)
         msg.setBodyCRC(UtilAll.crc32(msg.getBody()));
+        /*AppendMessageCallBack 的返回值变量*/
         // Back to Results
         AppendMessageResult result = null;
 
         StoreStatsService storeStatsService = this.defaultMessageStore.getStoreStatsService();
 
+        /*或许 消息 主题 和 队列ID*/
         String topic = msg.getTopic();
         int queueId = msg.getQueueId();
 
@@ -644,12 +649,17 @@ public class CommitLog {
             }
         }
 
+        /*持锁时间*/
         long elapsedTimeInLock = 0;
+        /*待释放锁定状态的 mappedFile（lock状态的mappedFile使用的内存 会锁死在 物理内存中， 不会使用swap区，性能很好）*/
         MappedFile unlockMappedFile = null;
+        /*获取当前顺序写的 mappedFile*/
         MappedFile mappedFile = this.mappedFileQueue.getLastMappedFile();
 
+        /*获取锁*/
         putMessageLock.lock(); //spin or ReentrantLock ,depending on store config
         try {
+            /*获取锁的时间*/
             long beginLockTimestamp = this.defaultMessageStore.getSystemClock().now();
             this.beginTimeInLock = beginLockTimestamp;
 
@@ -657,7 +667,8 @@ public class CommitLog {
             // global
             msg.setStoreTimestamp(beginLockTimestamp);
 
-            if (null == mappedFile || mappedFile.isFull()) {
+            if (null == mappedFile || mappedFile.isFull()) {/*条件成立：1.commitlog目录为空  2：文件写满了...*/
+                /*创建新的 mappedFile*/
                 mappedFile = this.mappedFileQueue.getLastMappedFile(0); // Mark: NewFile may be cause noise
             }
             if (null == mappedFile) {
@@ -666,6 +677,11 @@ public class CommitLog {
                 return CompletableFuture.completedFuture(new PutMessageResult(PutMessageStatus.CREATE_MAPEDFILE_FAILED, null));
             }
 
+            /*正常执行到这里*/
+            /*
+            * 参数1：msg
+            * 参数2：amc 控制消息哪些字段追加到 mappedFile中
+            * */
             result = mappedFile.appendMessage(msg, this.appendMessageCallback);
             switch (result.getStatus()) {
                 case PUT_OK:
@@ -693,10 +709,11 @@ public class CommitLog {
                     beginTimeInLock = 0;
                     return CompletableFuture.completedFuture(new PutMessageResult(PutMessageStatus.UNKNOWN_ERROR, result));
             }
-
+            /*计算 加锁期间耗时*/
             elapsedTimeInLock = this.defaultMessageStore.getSystemClock().now() - beginLockTimestamp;
             beginTimeInLock = 0;
         } finally {
+            /*释放锁*/
             putMessageLock.unlock();
         }
 
@@ -705,6 +722,7 @@ public class CommitLog {
         }
 
         if (null != unlockMappedFile && this.defaultMessageStore.getMessageStoreConfig().isWarmMapedFileEnable()) {
+            /*将 mappedByteBuffer 从 Lock状态 切换为 unlock状态*/
             this.defaultMessageStore.unlockMappedFile(unlockMappedFile);
         }
 
@@ -714,8 +732,11 @@ public class CommitLog {
         storeStatsService.getSinglePutMessageTopicTimesTotal(msg.getTopic()).incrementAndGet();
         storeStatsService.getSinglePutMessageTopicSizeTotal(topic).addAndGet(result.getWroteBytes());
 
+        /*通知刷盘线程*/
         CompletableFuture<PutMessageStatus> flushResultFuture = submitFlushRequest(result, msg);
+        /*HA 相关的...*/
         CompletableFuture<PutMessageStatus> replicaResultFuture = submitReplicaRequest(result, msg);
+
         return flushResultFuture.thenCombine(replicaResultFuture, (flushStatus, replicaStatus) -> {
             if (flushStatus != PutMessageStatus.PUT_OK) {
                 putMessageResult.setPutMessageStatus(flushStatus);
@@ -1587,6 +1608,8 @@ public class CommitLog {
             final MessageExtBrokerInner msgInner) {
             // STORETIMESTAMP + STOREHOSTADDRESS + OFFSET <br>
 
+
+            /*这条消息的 物理offset*/
             // PHY OFFSET
             long wroteOffset = fileFromOffset + byteBuffer.position();
 

@@ -251,15 +251,21 @@ public class CommitLog {
             }
 
             /*执行到这里， 说明 待恢复的数据 已经检查一遍了*/
-            /*在*/
+            /*在+ mappedFileOffset值之前，processOffset的值是 上面最后一个文件的 文件名的值
+            * 再加上 mappedFileOffset  processOffset表示的值就是 commitLog的全局位点
+            * */
             processOffset += mappedFileOffset;
+            /*设置 mappedFileQueue的刷盘位点*/
             this.mappedFileQueue.setFlushedWhere(processOffset);
             this.mappedFileQueue.setCommittedWhere(processOffset);
+
+            /*调整 mappedFileQueue当前顺序写的mappedFile 的刷盘位点 和 写入点*/
             this.mappedFileQueue.truncateDirtyFiles(processOffset);
 
             // Clear ConsumeQueue redundant data
             if (maxPhyOffsetOfConsumeQueue >= processOffset) {
                 log.warn("maxPhyOffsetOfConsumeQueue({}) >= processOffset({}), truncate dirty logic files", maxPhyOffsetOfConsumeQueue, processOffset);
+                /*删除 consumeQueue下的脏文件*/
                 this.defaultMessageStore.truncateDirtyLogicFiles(processOffset);
             }
         } else {
@@ -598,6 +604,10 @@ public class CommitLog {
         return beginTimeInLock;
     }
 
+    /**
+     *
+     * @param msg （消息）
+     */
     public CompletableFuture<PutMessageResult> asyncPutMessage(final MessageExtBrokerInner msg) {
         // Set the storage time
         msg.setStoreTimestamp(System.currentTimeMillis());

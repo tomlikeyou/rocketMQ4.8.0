@@ -40,10 +40,15 @@ public class IndexService {
      */
     private static final int MAX_TRY_IDX_CREATE = 3;
     private final DefaultMessageStore defaultMessageStore;
+    /*创建索引文件  每个索引文件包含的 哈希桶 数量：500w*/
     private final int hashSlotNum;
+    /*创建索引文件  每个索引文件包含的 索引条目 数量：2000w*/
     private final int indexNum;
+    /*索引文件存储目录：../store/index/ */
     private final String storePath;
+    /*索引对象集合（目录下的每个文件 都有一个indexFile对象）*/
     private final ArrayList<IndexFile> indexFileList = new ArrayList<IndexFile>();
+
     private final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
 
     public IndexService(final DefaultMessageStore store) {
@@ -87,6 +92,10 @@ public class IndexService {
         return true;
     }
 
+    /**
+     *
+     * @param offset commitLog内最早的消息 phyOffset
+     */
     public void deleteExpiredFile(long offset) {
         Object[] files = null;
         try {
@@ -96,6 +105,7 @@ public class IndexService {
             }
 
             long endPhyOffset = this.indexFileList.get(0).getEndPhyOffset();
+            /*条件成立：说明 索引目录内 存在过期的 索引文件*/
             if (endPhyOffset < offset) {
                 files = this.indexFileList.toArray();
             }
@@ -106,6 +116,7 @@ public class IndexService {
         }
 
         if (files != null) {
+            /*待删除的 索引文件集合*/
             List<IndexFile> fileList = new ArrayList<IndexFile>();
             for (int i = 0; i < (files.length - 1); i++) {
                 IndexFile f = (IndexFile) files[i];
@@ -198,13 +209,24 @@ public class IndexService {
         return topic + "#" + key;
     }
 
+    /**
+     * 上层 DefaultMessageStore 内部启动的 异步线程 会 将commitLog 内的 新msg 给包装成 DispatchRequest
+     * 最终交给当前方法
+     * @param req 类似于msg，只不过没有body字段
+     */
     public void buildIndex(DispatchRequest req) {
+        /*获取当前 索引文件，如果list内 不存在file 或者当前 file 已经写满的话，则创建一个 新的 file*/
         IndexFile indexFile = retryGetAndCreateIndexFile();
+
         if (indexFile != null) {
+            /*索引文件 最后一条消息的 offset*/
             long endPhyOffset = indexFile.getEndPhyOffset();
             DispatchRequest msg = req;
+            /*主题*/
             String topic = msg.getTopic();
+            /*键*/
             String keys = msg.getKeys();
+            /*条件成立：说明当前 req 已经在 索引文件内 追加过数据了...*/
             if (msg.getCommitLogOffset() < endPhyOffset) {
                 return;
             }
@@ -219,7 +241,11 @@ public class IndexService {
                     return;
             }
 
-            if (req.getUniqKey() != null) {
+            if (req.getUniqKey() != null) {/*为消息创建 唯一索引*/
+                /*参数1：indexFile 当前顺序写的 索引文件
+                * 参数2：msg 消息
+                * 参数3：主题#唯一索引
+                * */
                 indexFile = putKey(indexFile, msg, buildKey(topic, req.getUniqKey()));
                 if (indexFile == null) {
                     log.error("putKey error commitlog {} uniqkey {}", req.getCommitLogOffset(), req.getUniqKey());
@@ -227,6 +253,7 @@ public class IndexService {
                 }
             }
 
+            /*自定义 keys 索引插入的逻辑入口*/
             if (keys != null && keys.length() > 0) {
                 String[] keyset = keys.split(MessageConst.KEY_SEPARATOR);
                 for (int i = 0; i < keyset.length; i++) {
@@ -245,10 +272,15 @@ public class IndexService {
         }
     }
 
+    /*参数1：indexFile 当前顺序写的 索引文件
+     * 参数2：msg 消息
+     * 参数3：主题#唯一索引
+     * */
     private IndexFile putKey(IndexFile indexFile, DispatchRequest msg, String idxKey) {
         for (boolean ok = indexFile.putKey(idxKey, msg.getCommitLogOffset(), msg.getStoreTimestamp()); !ok; ) {
             log.warn("Index file [" + indexFile.getFileName() + "] is full, trying to create another one");
 
+            /*重新获取最新的 顺序写索引文件，因为走到这里有可能索引文件写满了已经*/
             indexFile = retryGetAndCreateIndexFile();
             if (null == indexFile) {
                 return null;

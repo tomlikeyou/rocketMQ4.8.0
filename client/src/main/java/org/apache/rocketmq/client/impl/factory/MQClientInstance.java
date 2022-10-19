@@ -969,10 +969,10 @@ public class MQClientInstance {
     }
 
     public boolean registerConsumer(final String group, final MQConsumerInner consumer) {
+
         if (null == group || null == consumer) {
             return false;
         }
-
         MQConsumerInner prev = this.consumerTable.putIfAbsent(group, consumer);
         if (prev != null) {
             log.warn("the consumer group[" + group + "] exist already.");

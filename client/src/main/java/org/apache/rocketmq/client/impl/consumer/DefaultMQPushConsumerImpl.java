@@ -1060,8 +1060,12 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
         return subSet;
     }
 
+    /**
+     * RebalanceService 服务 每20秒 调用一次该方法
+     */
     @Override
     public void doRebalance() {
+        /*检查当前消费者 是否暂停消费，如果非暂停状态，则进行负载均衡*/
         if (!this.pause) {
             this.rebalanceImpl.doRebalance(this.isConsumeOrderly());
         }

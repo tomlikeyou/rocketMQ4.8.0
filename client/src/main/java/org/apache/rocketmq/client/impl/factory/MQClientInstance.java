@@ -1142,9 +1142,12 @@ public class MQClientInstance {
         boolean slave = false;
         boolean found = false;
 
+        /*从broker地址表获取该broker的地址分布 map*/
         HashMap<Long/* brokerId */, String/* address */> map = this.brokerAddrTable.get(brokerName);
         if (map != null && !map.isEmpty()) {
+            /*获取指定brokerId的地址*/
             brokerAddr = map.get(brokerId);
+            /*条件成立：说明brokerId是从节点*/
             slave = brokerId != MixAll.MASTER_ID;
             found = brokerAddr != null;
 

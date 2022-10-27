@@ -20,6 +20,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ManyPullRequest {
+    /*一般情况下，这里只会有一个pullRequest，那什么情况下 这里会出现多个？
+    * 1、 广播模式下 一个消费者组下的每个消费者都消费一个主题，那么这里就可能有多个
+    * 2、集群模式下，当broker集群 broker主机节点数量发生了变化，这里也有可能出现多个
+    * */
     private final ArrayList<PullRequest> pullRequestList = new ArrayList<>();
 
     public synchronized void addPullRequest(final PullRequest pullRequest) {

@@ -630,21 +630,31 @@ public class CommitLog {
         final int tranType = MessageSysFlag.getTransactionValue(msg.getSysFlag());
         if (tranType == MessageSysFlag.TRANSACTION_NOT_TYPE
                 || tranType == MessageSysFlag.TRANSACTION_COMMIT_TYPE) {
+
+            /*这个代码块 说明消息设置了 延迟级别属性，这里会偷梁换柱，将消息的主题跟queueId给换成 调度延迟主题（SCHEDULE_TOPIC_XXXX） 延迟级别-1*/
             // Delay Delivery
             if (msg.getDelayTimeLevel() > 0) {
+
                 if (msg.getDelayTimeLevel() > this.defaultMessageStore.getScheduleMessageService().getMaxDelayLevel()) {
                     msg.setDelayTimeLevel(this.defaultMessageStore.getScheduleMessageService().getMaxDelayLevel());
                 }
 
+                /* SCHEDULE_TOPIC_XXXX */
                 topic = TopicValidator.RMQ_SYS_SCHEDULE_TOPIC;
+                /*延迟调度主题的 queueId为 延迟级别 -1 */
                 queueId = ScheduleMessageService.delayLevel2QueueId(msg.getDelayTimeLevel());
 
+                /*将消息的 “topic” %RETRY%GroupName queueId 0 记录到消息的属性中
+                * key：“REAL_TOPIC” "REAL_QUEUE_ID"
+                * */
                 // Backup real topic, queueId
                 MessageAccessor.putProperty(msg, MessageConst.PROPERTY_REAL_TOPIC, msg.getTopic());
                 MessageAccessor.putProperty(msg, MessageConst.PROPERTY_REAL_QUEUE_ID, String.valueOf(msg.getQueueId()));
                 msg.setPropertiesString(MessageDecoder.messageProperties2String(msg.getProperties()));
 
+                /*修改 主题为 SCHEDULE_TOPIC_XXXX*/
                 msg.setTopic(topic);
+                /*队列为 延迟级别 -1 */
                 msg.setQueueId(queueId);
             }
         }
@@ -875,6 +885,8 @@ public class CommitLog {
         final int tranType = MessageSysFlag.getTransactionValue(msg.getSysFlag());
         if (tranType == MessageSysFlag.TRANSACTION_NOT_TYPE
             || tranType == MessageSysFlag.TRANSACTION_COMMIT_TYPE) {
+
+            /*这个代码块 说明消息设置了 延迟级别，这里会偷梁换柱，将消息的主题跟queueId给换成 调度延迟主题（SCHEDULE_TOPIC_XXXX） 延迟级别-1*/
             // Delay Delivery
             if (msg.getDelayTimeLevel() > 0) {
                 if (msg.getDelayTimeLevel() > this.defaultMessageStore.getScheduleMessageService().getMaxDelayLevel()) {
@@ -889,7 +901,9 @@ public class CommitLog {
                 MessageAccessor.putProperty(msg, MessageConst.PROPERTY_REAL_QUEUE_ID, String.valueOf(msg.getQueueId()));
                 msg.setPropertiesString(MessageDecoder.messageProperties2String(msg.getProperties()));
 
+                /*修改主题*/
                 msg.setTopic(topic);
+                /*修改queueId*/
                 msg.setQueueId(queueId);
             }
         }

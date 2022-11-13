@@ -318,7 +318,7 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
                 break;
             case CLUSTERING:
                 List<MessageExt> msgBackFailed = new ArrayList<MessageExt>(consumeRequest.getMsgs().size());
-                /*当消费失败时，该消费任务的全部消息 都会 尝试回退给 服务器*/
+                /*消费成功时，ackIndex = size -1 会直接跳过这个循环，不执行消息回退逻辑；当消费失败时，该消费任务的全部消息 都会 尝试回退给 服务器*/
                 for (int i = ackIndex + 1; i < consumeRequest.getMsgs().size(); i++) {
                     MessageExt msg = consumeRequest.getMsgs().get(i);
                     boolean result = this.sendMessageBack(msg, context);
@@ -342,7 +342,7 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
                 break;
         }
 
-        /*从pq中 删除已经消费成功的消息，返回offset
+        /*从pq中 删除已经消费成功的消息，返回offset 这里的消费成功的消息 指的是消费成功的 或者 消费失败但是消息回退成功的消息
         * 返回值
         * （1、-1：说明pq 内 无数据  2、queueOffsetMax + 1（删完这批msgs之后 无消息了） 3、删完该批msgs之后 pq内 还有剩余待消费的消息，此时返回 firstMsg offset）
         * */
@@ -367,6 +367,11 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
         // Wrap topic with namespace before sending back message.
         msg.setTopic(this.defaultMQPushConsumer.withNamespace(msg.getTopic()));
         try {
+            /*
+            * 参数1：需要回退的消息
+            * 参数2：消息的延迟级别
+            * 参数3：消息所属的消息队列的 所属brokerName
+            * */
             this.defaultMQPushConsumerImpl.sendMessageBack(msg, delayLevel, context.getMessageQueue().getBrokerName());
             return true;
         } catch (Exception e) {

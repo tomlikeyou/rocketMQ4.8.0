@@ -41,6 +41,7 @@ public class MessageExt extends Message {
     private long storeTimestamp;
     private SocketAddress storeHost;
     private String msgId;
+    /*消息在commitLog中对应的物理偏移量*/
     private long commitLogOffset;
     private int bodyCRC;
     private int reconsumeTimes;

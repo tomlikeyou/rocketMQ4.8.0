@@ -613,14 +613,29 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
         log.info("resume this consumer, {}", this.defaultMQPushConsumer.getConsumerGroup());
     }
 
+    /* 向broker 发送消息回退请求
+     * 参数1：需要回退的消息
+     * 参数2：消息的延迟级别
+     * 参数3：消息所属的消息队列的 所属brokerName
+     * */
     public void sendMessageBack(MessageExt msg, int delayLevel, final String brokerName)
         throws RemotingException, MQBrokerException, InterruptedException, MQClientException {
         try {
+            /*根据brokerName 从客户端 broker地址映射表里获取 master节点物理ip地址*/
             String brokerAddr = (null != brokerName) ? this.mQClientFactory.findBrokerAddressInPublish(brokerName)
                 : RemotingHelper.parseSocketAddressAddr(msg.getStoreHost());
+            /*
+            * 参数1：broker地址
+            * 参数2：需要回退的msg
+            * 参数3：消费者组
+            * 参数4：延迟级别
+            * 参数5：网络请求超时时间
+            * 参数6：最大重消费次数
+            * */
             this.mQClientFactory.getMQClientAPIImpl().consumerSendMessageBack(brokerAddr, msg,
                 this.defaultMQPushConsumer.getConsumerGroup(), delayLevel, 5000, getMaxReconsumeTimes());
         } catch (Exception e) {
+            /*发送回退消息请求失败*/
             log.error("sendMessageBack Exception, " + this.defaultMQPushConsumer.getConsumerGroup(), e);
 
             Message newMsg = new Message(MixAll.getRetryTopic(this.defaultMQPushConsumer.getConsumerGroup()), msg.getBody());
@@ -638,6 +653,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
 
             this.mQClientFactory.getDefaultMQProducer().send(newMsg);
         } finally {
+            /*恢复msg的主题（去掉namespace前缀信息）*/
             msg.setTopic(NamespaceUtil.withoutNamespace(msg.getTopic(), this.defaultMQPushConsumer.getNamespace()));
         }
     }

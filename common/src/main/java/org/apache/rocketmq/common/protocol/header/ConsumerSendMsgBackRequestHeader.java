@@ -23,16 +23,22 @@ import org.apache.rocketmq.remoting.annotation.CFNullable;
 import org.apache.rocketmq.remoting.exception.RemotingCommandException;
 
 public class ConsumerSendMsgBackRequestHeader implements CommandCustomHeader {
+    /*回退消息的 在commitLog的offset*/
     @CFNotNull
     private Long offset;
+    /*消费者组*/
     @CFNotNull
     private String group;
+    /*延迟级别（一般都是0）*/
     @CFNotNull
     private Integer delayLevel;
+    /*原始消息 msgId*/
     private String originMsgId;
+    /*原始消息 主题*/
     private String originTopic;
     @CFNullable
     private boolean unitMode = false;
+    /*最大重试次数（默认：16）*/
     private Integer maxReconsumeTimes;
 
     @Override

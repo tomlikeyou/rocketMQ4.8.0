@@ -1180,6 +1180,14 @@ public class MQClientAPIImpl {
         return response.getCode() == ResponseCode.SUCCESS;
     }
 
+    /*
+     * 参数1：broker地址
+     * 参数2：需要回退的msg
+     * 参数3：消费者组
+     * 参数4：延迟级别
+     * 参数5：网络请求超时时间
+     * 参数6：最大重消费次数
+     * */
     public void consumerSendMessageBack(
         final String addr,
         final MessageExt msg,
@@ -1189,6 +1197,7 @@ public class MQClientAPIImpl {
         final int maxConsumeRetryTimes
     ) throws RemotingException, MQBrokerException, InterruptedException {
         ConsumerSendMsgBackRequestHeader requestHeader = new ConsumerSendMsgBackRequestHeader();
+        /*创建 RemotingCommand对象*/
         RemotingCommand request = RemotingCommand.createRequestCommand(RequestCode.CONSUMER_SEND_MSG_BACK, requestHeader);
 
         requestHeader.setGroup(consumerGroup);

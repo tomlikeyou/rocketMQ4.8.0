@@ -1040,16 +1040,28 @@ public class CommitLog {
     }
 
 
+    /**
+     * 刷盘逻辑入口
+     * @param result 消息append结果
+     * @param putMessageResult 写消息结果
+     * @param messageExt 消息
+     */
     public void handleDiskFlush(AppendMessageResult result, PutMessageResult putMessageResult, MessageExt messageExt) {
         // Synchronization flush
         if (FlushDiskType.SYNC_FLUSH == this.defaultMessageStore.getMessageStoreConfig().getFlushDiskType()) {
+            /*同步刷盘*/
             final GroupCommitService service = (GroupCommitService) this.flushCommitLogService;
+
             if (messageExt.isWaitStoreMsgOK()) {
+                /*一般情况走这里*/
                 GroupCommitRequest request = new GroupCommitRequest(result.getWroteOffset() + result.getWroteBytes());
                 service.putRequest(request);
+
+                /*写消息线程 获取到 request#future对象*/
                 CompletableFuture<PutMessageStatus> flushOkFuture = request.future();
                 PutMessageStatus flushStatus = null;
                 try {
+                    /*写消息线程 在这里阻塞等待 future结果*/
                     flushStatus = flushOkFuture.get(this.defaultMessageStore.getMessageStoreConfig().getSyncFlushTimeout(),
                             TimeUnit.MILLISECONDS);
                 } catch (InterruptedException | ExecutionException | TimeoutException e) {
@@ -1470,7 +1482,9 @@ public class CommitLog {
     }
 
     public static class GroupCommitRequest {
+        /*本条消息存储之后，下一条消息开始的offset*/
         private final long nextOffset;
+        /*future对象*/
         private CompletableFuture<PutMessageStatus> flushOKFuture = new CompletableFuture<>();
         private final long startTimestamp = System.currentTimeMillis();
         private long timeoutMillis = Long.MAX_VALUE;
@@ -1525,12 +1539,17 @@ public class CommitLog {
                     for (GroupCommitRequest req : this.requestsRead) {
                         // There may be a message in the next file, so a maximum of
                         // two times the flush
+                        /*条件成立：说明 request 关联的 “生产者线程”  需要被唤醒了，因为 这个request需要写入磁盘的数据已经写进去了*/
                         boolean flushOK = CommitLog.this.mappedFileQueue.getFlushedWhere() >= req.getNextOffset();
+
                         for (int i = 0; i < 2 && !flushOK; i++) {
+                            /*走到这里，说明request对应需要写的消息 还没有 被 刷盘 注意参数：传的是 0！ 表示底层 mappedFile 只要有脏数据 就进行刷盘*/
                             CommitLog.this.mappedFileQueue.flush(0);
+                            /*刷盘成之后，这里一定是true*/
                             flushOK = CommitLog.this.mappedFileQueue.getFlushedWhere() >= req.getNextOffset();
                         }
 
+                        /*设置 request的future对象 结果，在future阻塞的线程 在这一步 会被唤醒*/
                         req.wakeupCustomer(flushOK ? PutMessageStatus.PUT_OK : PutMessageStatus.FLUSH_DISK_TIMEOUT);
                     }
 
@@ -1538,7 +1557,7 @@ public class CommitLog {
                     if (storeTimestamp > 0) {
                         CommitLog.this.defaultMessageStore.getStoreCheckpoint().setPhysicMsgTimestamp(storeTimestamp);
                     }
-
+                    /*清理 requestsRead列表，方便等下 交换时 ，成为 requestsWrite 使用*/
                     this.requestsRead.clear();
                 } else {
                     // Because of individual messages is set to not sync flush, it

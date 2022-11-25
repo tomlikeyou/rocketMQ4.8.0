@@ -286,8 +286,10 @@ public class ProcessQueue {
                 for (MessageExt msg : this.consumingMsgOrderlyTreeMap.values()) {
                     msgSize.addAndGet(0 - msg.getBody().length);
                 }
+                /*将临时保存msgs的map清除*/
                 this.consumingMsgOrderlyTreeMap.clear();
                 if (offset != null) {
+                    /*消费者 下一条 要消费的消息 offset*/
                     return offset + 1;
                 }
             } finally {

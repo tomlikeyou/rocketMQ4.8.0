@@ -90,9 +90,12 @@ public class RebalancePushImpl extends RebalanceImpl {
 
         if (this.defaultMQPushConsumerImpl.isConsumeOrderly()
             && MessageModel.CLUSTERING.equals(this.defaultMQPushConsumerImpl.messageModel())) {
+
+            /*集群模式下，顺序消费，会执行该逻辑*/
             try {
                 if (pq.getLockConsume().tryLock(1000, TimeUnit.MILLISECONDS)) {
                     try {
+                        /*释放锁（broker端的 队列锁）*/
                         return this.unlockDelay(mq, pq);
                     } finally {
                         pq.getLockConsume().unlock();
@@ -117,6 +120,7 @@ public class RebalancePushImpl extends RebalanceImpl {
 
         if (pq.hasTempMessage()) {
             log.info("[{}]unlockDelay, begin {} ", mq.hashCode(), mq);
+            /*当pq内的 treeMap有数据时，延迟20秒释放 队列分布式锁（这里延迟20秒是确保 全局范围内 只有一个消费任务 运行中）*/
             this.defaultMQPushConsumerImpl.getmQClientFactory().getScheduledExecutorService().schedule(new Runnable() {
                 @Override
                 public void run() {
@@ -125,6 +129,8 @@ public class RebalancePushImpl extends RebalanceImpl {
                 }
             }, UNLOCK_DELAY_TIME_MILLS, TimeUnit.MILLISECONDS);
         } else {
+            /*执行到这里，可以确定 当前消费者本地的 消费任务已经退出了！*/
+            /*释放 队列分布式锁*/
             this.unlock(mq, true);
         }
         return true;

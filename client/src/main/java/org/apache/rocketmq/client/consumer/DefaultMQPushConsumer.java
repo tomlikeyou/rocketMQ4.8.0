@@ -268,7 +268,7 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
      * If messages are re-consumed more than {@link #maxReconsumeTimes} before success, it's be directed to a deletion
      * queue waiting.
      */
-    /*消息最大重试次数（默认 -1 ，意味着 重试 16次）*/
+    /*消息最大重试次数（默认 -1 ）*/
     private int maxReconsumeTimes = -1;
 
     /**

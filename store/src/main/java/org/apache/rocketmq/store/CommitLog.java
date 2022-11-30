@@ -91,6 +91,7 @@ public class CommitLog {
         this.defaultMessageStore = defaultMessageStore;
 
         if (FlushDiskType.SYNC_FLUSH == defaultMessageStore.getMessageStoreConfig().getFlushDiskType()) {
+            /*同步刷盘*/
             this.flushCommitLogService = new GroupCommitService();
         } else {
             /*默认异步刷盘 ，创建这个对象*/
@@ -113,6 +114,7 @@ public class CommitLog {
     }
 
     public boolean load() {
+        /*调用mfq的load方法*/
         boolean result = this.mappedFileQueue.load();
         log.info("load commit log " + (result ? "OK" : "Failed"));
         return result;

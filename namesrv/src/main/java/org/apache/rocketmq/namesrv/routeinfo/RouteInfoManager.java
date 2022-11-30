@@ -479,6 +479,7 @@ public class RouteInfoManager {
                 it.remove();
                 log.warn("The broker channel expired, {} {}ms", next.getKey(), BROKER_CHANNEL_EXPIRED_TIME);
                 /*
+                * 手动触发 网络异常事件 处理器的方法，在namesrv中移除一切跟该broker相关的信息！
                 * 参数1：brokerAddr
                 * 参数2：服务器与 broker物理节点的 channel信息
                 * */

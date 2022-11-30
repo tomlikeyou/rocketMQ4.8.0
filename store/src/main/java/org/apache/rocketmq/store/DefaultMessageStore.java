@@ -128,6 +128,7 @@ public class DefaultMessageStore implements MessageStore {
         if (messageStoreConfig.isEnableDLegerCommitLog()) {
             this.commitLog = new DLedgerCommitLog(this);
         } else {
+            /*初始化commitLog*/
             this.commitLog = new CommitLog(this);
         }
         this.consumeQueueTable = new ConcurrentHashMap<>(32);
@@ -138,6 +139,7 @@ public class DefaultMessageStore implements MessageStore {
         this.storeStatsService = new StoreStatsService();
         this.indexService = new IndexService(this);
         if (!messageStoreConfig.isEnableDLegerCommitLog()) {
+            /*一般情况下 走这里 初始化 ha服务*/
             this.haService = new HAService(this);
         } else {
             this.haService = null;
@@ -182,6 +184,7 @@ public class DefaultMessageStore implements MessageStore {
         boolean result = true;
 
         try {
+            /*如果存在abort文件 则表示上一次退出不是正常退出*/
             boolean lastExitOK = !this.isTempFileExist();
             log.info("last shutdown {}", lastExitOK ? "normally" : "abnormally");
 
@@ -189,9 +192,11 @@ public class DefaultMessageStore implements MessageStore {
                 result = result && this.scheduleMessageService.load();
             }
 
+            /*加载commitLog目录*/
             // load Commit Log
             result = result && this.commitLog.load();
 
+            /*加载consumeQueue目录*/
             // load Consume Queue
             result = result && this.loadConsumeQueue();
 
@@ -1498,6 +1503,7 @@ public class DefaultMessageStore implements MessageStore {
     }
 
     private boolean loadConsumeQueue() {
+        /*/store/consumequeue/*/
         File dirLogic = new File(StorePathConfigHelper.getStorePathConsumeQueue(this.messageStoreConfig.getStorePathRootDir()));
         File[] fileTopicList = dirLogic.listFiles();
         if (fileTopicList != null) {

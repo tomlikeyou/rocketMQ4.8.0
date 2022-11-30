@@ -240,6 +240,7 @@ public class BrokerController {
 
         if (result) {
             try {
+                /*创建一个messageStore对象*/
                 this.messageStore =
                     new DefaultMessageStore(this.messageStoreConfig, this.brokerStatsManager, this.messageArrivingListener,
                         this.brokerConfig);
@@ -258,6 +259,7 @@ public class BrokerController {
             }
         }
 
+        /*执行messageStore的load方法*/
         result = result && this.messageStore.load();
 
         if (result) {

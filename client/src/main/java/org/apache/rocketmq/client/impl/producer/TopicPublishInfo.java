@@ -24,7 +24,9 @@ import org.apache.rocketmq.common.protocol.route.QueueData;
 import org.apache.rocketmq.common.protocol.route.TopicRouteData;
 
 public class TopicPublishInfo {
+    /*是否是顺序主题*/
     private boolean orderTopic = false;
+    /*是否有主题路由信息*/
     private boolean haveTopicRouterInfo = false;
     /*主题全部的队列信息*/
     private List<MessageQueue> messageQueueList = new ArrayList<MessageQueue>();
@@ -70,13 +72,15 @@ public class TopicPublishInfo {
 
     /*
     * 默认选择队列的方法
-    * 参数：上次失败的 brokerName（可以为null）
+    * 参数：上次失败的 brokerName（可以为null：第一次选择消息队列时候）
     * 返回值：当前主题下的一个队列
     * */
     public MessageQueue selectOneMessageQueue(final String lastBrokerName) {
+        /*第一次选择一个消息队列时候，lastBrokerName为空*/
         if (lastBrokerName == null) {
             return selectOneMessageQueue();
         } else {
+            /*走到这里：说明上一次选择的消息队列发送消息失败了，这时候选择，需要跳过该broker下面所有的消息队列，否则有可能会再次发送失败*/
             for (int i = 0; i < this.messageQueueList.size(); i++) {
                 int index = this.sendWhichQueue.getAndIncrement();
                 int pos = Math.abs(index) % this.messageQueueList.size();
@@ -92,7 +96,9 @@ public class TopicPublishInfo {
     }
 
     public MessageQueue selectOneMessageQueue() {
+        /*自增获取值*/
         int index = this.sendWhichQueue.getAndIncrement();
+        /*与当前主题发布信息的队列表取模，返回该位置的消息队列*/
         int pos = Math.abs(index) % this.messageQueueList.size();
         if (pos < 0)
             pos = 0;

@@ -26,9 +26,12 @@ public class MQFaultStrategy {
     private final static InternalLogger log = ClientLogger.getLog();
     private final LatencyFaultTolerance<String> latencyFaultTolerance = new LatencyFaultToleranceImpl();
 
+    /*是否启用延迟故障功能*/
     private boolean sendLatencyFaultEnable = false;
 
+    /*定义了延迟的几个级别，单位ms*/
     private long[] latencyMax = {50L, 100L, 550L, 1000L, 2000L, 3000L, 15000L};
+    /*定义了故障后的不可用时长，单位ms，与延迟级别相关*/
     private long[] notAvailableDuration = {0L, 0L, 30000L, 60000L, 120000L, 180000L, 600000L};
 
     public long[] getNotAvailableDuration() {
@@ -57,6 +60,7 @@ public class MQFaultStrategy {
 
     public MessageQueue selectOneMessageQueue(final TopicPublishInfo tpInfo, final String lastBrokerName) {
         if (this.sendLatencyFaultEnable) {
+            /*启用了故障延迟功能*/
             try {
                 int index = tpInfo.getSendWhichQueue().getAndIncrement();
                 for (int i = 0; i < tpInfo.getMessageQueueList().size(); i++) {
@@ -86,7 +90,7 @@ public class MQFaultStrategy {
 
             return tpInfo.selectOneMessageQueue();
         }
-
+        /*默认没启用故障延迟功能，走这里*/
         return tpInfo.selectOneMessageQueue(lastBrokerName);
     }
 

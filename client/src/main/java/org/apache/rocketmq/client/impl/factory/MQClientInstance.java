@@ -195,10 +195,19 @@ public class MQClientInstance {
             MQVersion.getVersionDesc(MQVersion.CURRENT_VERSION), RemotingCommand.getSerializeTypeConfigInThisServer());
     }
 
+    /**
+     * 将指定主题的路由信息转换为主题发布信息
+     * @param topic 主题信息
+     * @param route 从namesrv上获取到的指定topic主题的主题路由信息
+     * @return 主题发布信息
+     */
     public static TopicPublishInfo topicRouteData2TopicPublishInfo(final String topic, final TopicRouteData route) {
+        /*创建一个主题发布信息*/
         TopicPublishInfo info = new TopicPublishInfo();
+        /*保存主题路由信息*/
         info.setTopicRouteData(route);
         if (route.getOrderTopicConf() != null && route.getOrderTopicConf().length() > 0) {
+            /*顺序主题相关...*/
             String[] brokers = route.getOrderTopicConf().split(";");
             for (String broker : brokers) {
                 String[] item = broker.split(":");
@@ -211,8 +220,13 @@ public class MQClientInstance {
 
             info.setOrderTopic(true);
         } else {
+            /*大多数情况会走到这里...*/
+
+            /*获取路由信息里的队列元数据集合*/
             List<QueueData> qds = route.getQueueDatas();
+            /*队列元数据集合排序*/
             Collections.sort(qds);
+            /*遍历每一个队列元数据信息，根据队列所属的broker名称，从主题路由信息中的broker元数据集合中找到对应的broker信息（必须包含master节点）*/
             for (QueueData qd : qds) {
                 if (PermName.isWriteable(qd.getPerm())) {
                     BrokerData brokerData = null;
@@ -223,14 +237,19 @@ public class MQClientInstance {
                         }
                     }
 
+                    /*条件成立，说明该队列 没有从对应的broker元数据集合中找到对应的broker信息，跳过该队列*/
                     if (null == brokerData) {
                         continue;
                     }
 
+                    /*走到这里前提：该队列从对应的broker元数据集合中找到了对应的broker信息
+                    * 条件成立：说明该broker信息并不包含master节点，也不满足条件，跳过
+                    * */
                     if (!brokerData.getBrokerAddrs().containsKey(MixAll.MASTER_ID)) {
                         continue;
                     }
 
+                    /*走到这里：说明真正找到了合适的broker信息（有master节点），遍历队列的写队列数，创建多个队列，保存到主题发布信息的队列集合当中*/
                     for (int i = 0; i < qd.getWriteQueueNums(); i++) {
                         MessageQueue mq = new MessageQueue(topic, qd.getBrokerName(), i);
                         info.getMessageQueueList().add(mq);
@@ -238,6 +257,7 @@ public class MQClientInstance {
                 }
             }
 
+            /*设置该主题 顺序主题属性：false*/
             info.setOrderTopic(false);
         }
 
@@ -744,7 +764,9 @@ public class MQClientInstance {
                             {
                                 /*将 topic的 路由数据 转换为 主题发布数据*/
                                 TopicPublishInfo publishInfo = topicRouteData2TopicPublishInfo(topic, topicRouteData);
+                                /*主题发布信息设置 是否有主题路由信息：true*/
                                 publishInfo.setHaveTopicRouterInfo(true);
+                                /*遍历客户端的所有生产者*/
                                 Iterator<Entry<String, MQProducerInner>> it = this.producerTable.entrySet().iterator();
                                 while (it.hasNext()) {
                                     Entry<String, MQProducerInner> entry = it.next();

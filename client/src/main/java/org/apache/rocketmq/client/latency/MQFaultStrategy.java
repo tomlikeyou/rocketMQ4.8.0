@@ -26,7 +26,7 @@ public class MQFaultStrategy {
     private final static InternalLogger log = ClientLogger.getLog();
     private final LatencyFaultTolerance<String> latencyFaultTolerance = new LatencyFaultToleranceImpl();
 
-    /*是否启用延迟故障功能*/
+    /*是否启用broker延迟故障规避功能，默认不开启*/
     private boolean sendLatencyFaultEnable = false;
 
     /*定义了延迟的几个级别，单位ms*/
@@ -60,7 +60,7 @@ public class MQFaultStrategy {
 
     public MessageQueue selectOneMessageQueue(final TopicPublishInfo tpInfo, final String lastBrokerName) {
         if (this.sendLatencyFaultEnable) {
-            /*启用了故障延迟功能*/
+            /*启用了broker延迟故障规避功能*/
             try {
                 int index = tpInfo.getSendWhichQueue().getAndIncrement();
                 for (int i = 0; i < tpInfo.getMessageQueueList().size(); i++) {

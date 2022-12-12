@@ -25,12 +25,14 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.apache.rocketmq.client.common.ThreadLocalIndex;
 
 public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> {
+    /*broker故障条目项*/
     private final ConcurrentHashMap<String, FaultItem> faultItemTable = new ConcurrentHashMap<String, FaultItem>(16);
 
     private final ThreadLocalIndex whichItemWorst = new ThreadLocalIndex();
 
     @Override
     public void updateFaultItem(final String name, final long currentLatency, final long notAvailableDuration) {
+        /*根据broker名称获取对应的故障项*/
         FaultItem old = this.faultItemTable.get(name);
         if (null == old) {
             final FaultItem faultItem = new FaultItem(name);
@@ -64,6 +66,7 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
 
     @Override
     public String pickOneAtLeast() {
+        /*先复制一份有故障的broker列表，后面好做打乱*/
         final Enumeration<FaultItem> elements = this.faultItemTable.elements();
         List<FaultItem> tmpList = new LinkedList<FaultItem>();
         while (elements.hasMoreElements()) {
@@ -72,10 +75,13 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
         }
 
         if (!tmpList.isEmpty()) {
+            /*打乱故障的broker列表*/
             Collections.shuffle(tmpList);
 
+            /*排序*/
             Collections.sort(tmpList);
 
+            /*从50%里面依次递增选择一个broker*/
             final int half = tmpList.size() / 2;
             if (half <= 0) {
                 return tmpList.get(0).getName();
@@ -97,8 +103,11 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
     }
 
     class FaultItem implements Comparable<FaultItem> {
+        /*故障的（不一定真的有故障的）broker名称*/
         private final String name;
+        /*发送延迟时间戳（单位：毫秒）*/
         private volatile long currentLatency;
+        /*故障的结束时间戳*/
         private volatile long startTimestamp;
 
         public FaultItem(final String name) {
@@ -130,6 +139,10 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
             return 0;
         }
 
+        /*判断一个broker是否可用：
+        * true：当前broker可用，当前时间戳大于故障broker的故障结束时间
+        * false：当前broker不可用
+        * */
         public boolean isAvailable() {
             return (System.currentTimeMillis() - startTimestamp) >= 0;
         }

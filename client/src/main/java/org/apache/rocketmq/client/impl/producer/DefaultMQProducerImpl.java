@@ -617,7 +617,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
             int times = 0;
             /*下标值 代表发送的 第几次，值 代表 这次发送 选择的 brokerName*/
             String[] brokersSent = new String[timesTotal];
-            /*循环发送，什么时候跳出循环？ 1. 发送成功 2 发送尝试次数 达到上限*/
+            /*循环发送，什么时候跳出循环？ 1. 发送成功 2 发送尝试次数 达到上限 3.发送超时*/
             for (; times < timesTotal; times++) {
                 /*上次发送的brookerName，第一次发送时候 为null，其他情况就是上一次发送的 brokerName*/
                 String lastBrokerName = null == mq ? null : mq.getBrokerName();
@@ -682,20 +682,25 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                         }
                     } catch (RemotingException e) {
                         endTimestamp = System.currentTimeMillis();
-                        this.updateFaultItem(mq.getBrokerName(), endTimestamp - beginTimestampPrev, true);
+                        /*发送消息异常，也会更新该broker的不可用时间，注意第三个参数为true，意味着不可用时间为10分钟*/
+                        this.updateFaultItem(mq.getBrokerName()/*brokerName*/, endTimestamp - beginTimestampPrev/*本次发送延迟时间*/, true);
                         log.warn(String.format("sendKernelImpl exception, resend at once, InvokeID: %s, RT: %sms, Broker: %s", invokeID, endTimestamp - beginTimestampPrev, mq), e);
                         log.warn(msg.toString());
                         exception = e;
+                        /*重试*/
                         continue;
                     } catch (MQClientException e) {
                         endTimestamp = System.currentTimeMillis();
+                        /*发送消息异常，也会更新该broker的不可用时间，注意第三个参数为true，意味着不可用时间为10分钟*/
                         this.updateFaultItem(mq.getBrokerName(), endTimestamp - beginTimestampPrev, true);
                         log.warn(String.format("sendKernelImpl exception, resend at once, InvokeID: %s, RT: %sms, Broker: %s", invokeID, endTimestamp - beginTimestampPrev, mq), e);
                         log.warn(msg.toString());
                         exception = e;
+                        /*重试*/
                         continue;
                     } catch (MQBrokerException e) {
                         endTimestamp = System.currentTimeMillis();
+                        /*发送消息异常，也会更新该broker的不可用时间，注意第三个参数为true，意味着不可用时间为10分钟*/
                         this.updateFaultItem(mq.getBrokerName(), endTimestamp - beginTimestampPrev, true);
                         log.warn(String.format("sendKernelImpl exception, resend at once, InvokeID: %s, RT: %sms, Broker: %s", invokeID, endTimestamp - beginTimestampPrev, mq), e);
                         log.warn(msg.toString());
@@ -717,6 +722,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                         }
                     } catch (InterruptedException e) {
                         endTimestamp = System.currentTimeMillis();
+                        /*发送消息异常，也会更新该broker的不可用时间，注意第三个参数为true，意味着不可用时间为10分钟*/
                         this.updateFaultItem(mq.getBrokerName(), endTimestamp - beginTimestampPrev, false);
                         log.warn(String.format("sendKernelImpl exception, throw exception, InvokeID: %s, RT: %sms, Broker: %s", invokeID, endTimestamp - beginTimestampPrev, mq), e);
                         log.warn(msg.toString());

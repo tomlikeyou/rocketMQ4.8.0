@@ -388,7 +388,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
         throws InterruptedException, RemotingConnectException, RemotingSendRequestException, RemotingTimeoutException {
         /*开始时间*/
         long beginStartTime = System.currentTimeMillis();
-        /*获取 或者 创建  客户端与服务端(addr)的 通道channle*/
+        /*获取 或者 创建  客户端与服务端(addr)的 通道channel*/
         final Channel channel = this.getAndCreateChannel(addr);
 
         /*条件成立：说明客户端 与服务端 channel 通道正常，可以通信*/

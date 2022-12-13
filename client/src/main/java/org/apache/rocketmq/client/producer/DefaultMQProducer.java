@@ -982,12 +982,17 @@ public class DefaultMQProducer extends ClientConfig implements MQProducer {
     private MessageBatch batch(Collection<Message> msgs) throws MQClientException {
         MessageBatch msgBatch;
         try {
+            /*批量发送的消息生成一个批量消息*/
             msgBatch = MessageBatch.generateFromList(msgs);
             for (Message message : msgBatch) {
+                /*校验消息*/
                 Validators.checkMessage(message, this);
+                /*给消息设置一个msg id*/
                 MessageClientIDSetter.setUniqID(message);
+                /*设置批量消息的主题*/
                 message.setTopic(withNamespace(message.getTopic()));
             }
+            /*对批量发送的消息体进行编码保存到 批量消息类的消息体*/
             msgBatch.setBody(msgBatch.encode());
         } catch (Exception e) {
             throw new MQClientException("Failed to initiate the MessageBatch", e);

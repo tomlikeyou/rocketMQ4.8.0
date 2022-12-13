@@ -517,6 +517,7 @@ public class MessageDecoder {
         //TO DO refactor, accumulate in one buffer, avoid copies
         List<byte[]> encodedMessages = new ArrayList<byte[]>(messages.size());
         int allSize = 0;
+        /*遍历每一条消息，进行编码保存到list集合*/
         for (Message message : messages) {
             byte[] tmp = encodeMessage(message);
             encodedMessages.add(tmp);
@@ -524,6 +525,7 @@ public class MessageDecoder {
         }
         byte[] allBytes = new byte[allSize];
         int pos = 0;
+        /*将消息的字节数组组装成一个大的字节数组*/
         for (byte[] bytes : encodedMessages) {
             System.arraycopy(bytes, 0, allBytes, pos, bytes.length);
             pos += bytes.length;

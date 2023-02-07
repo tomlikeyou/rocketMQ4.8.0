@@ -36,10 +36,11 @@ public class IndexFile {
     /*无效索引编号：0 特殊值*/
     private static int invalidIndex = 0;
 
-    /*默认值：500w*/
+    /*hash桶的个数 默认值：500w*/
     private final int hashSlotNum;
-    /*默认值：2000w*/
+    /*index条目数据个数 默认值：2000w*/
     private final int indexNum;
+
     /*索引文件使用的mappedFile*/
     private final MappedFile mappedFile;
     private final FileChannel fileChannel;
@@ -156,25 +157,25 @@ public class IndexFile {
                     timeDiff = 0;
                 }
 
-                /*计算出索引条目写入的位置：40 + 500w * 4 + 索引编号 * 20*/
+                /*计算出索引条目写入的位置：40 + 500w * 4byte + 索引编号 * 20byte*/
                 int absIndexPos =
                     IndexHeader.INDEX_HEADER_SIZE + this.hashSlotNum * hashSlotSize
                         + this.indexHeader.getIndexCount() * indexSize;
 
                 /*写索引数据*/
-                /*key hashcode*/
+                /*key hashcode 4byte*/
                 this.mappedByteBuffer.putInt(absIndexPos, keyHash);
-                /*消息偏移量*/
+                /*消息物理偏移量 8byte*/
                 this.mappedByteBuffer.putLong(absIndexPos + 4, phyOffset);
-                /*消息存储时间（第一条索引条目数据的 差值）*/
+                /*消息存储时间（与第一条索引条目数据存储时间的 差值） 4byte*/
                 this.mappedByteBuffer.putInt(absIndexPos + 4 + 8, (int) timeDiff);
-                /*hash桶的 原值（当发生hash冲突时 会使用到）*/
+                /*hash桶的 原值（当发生hash冲突时 会使用到） 4byte*/
                 this.mappedByteBuffer.putInt(absIndexPos + 4 + 8 + 4, slotValue);
 
-                /*向当前 key计算出来的 hash桶内的 写入索引编号*/
+                /*向当前 key计算出来的 hash桶内的 写入索引数据的编号*/
                 this.mappedByteBuffer.putInt(absSlotPos, this.indexHeader.getIndexCount());
 
-                /*索引文件插入的第一条数据，*/
+                /*索引文件插入的第一条数据，需要更新下开始的物理偏移量跟存储时间*/
                 if (this.indexHeader.getIndexCount() <= 1) {
                     this.indexHeader.setBeginPhyOffset(phyOffset);
                     this.indexHeader.setBeginTimestamp(storeTimestamp);
@@ -237,17 +238,17 @@ public class IndexFile {
     }
 
     /**
-     *
-     * @param phyOffsets 查询结果全部放到 该list内
+     * 根据msg的key查询出消息的物理偏移量
+     * @param phyOffsets 查询结果全部放到 该list内，list内保存的是匹配的消息物理偏移量
      * @param key 查询key
-     * @param maxNum 结果最大数限制
+     * @param maxNum 查询结果最大数限制
      * @param begin
      * @param end
      */
     public void selectPhyOffset(final List<Long> phyOffsets, final String key, final int maxNum,
         final long begin, final long end, boolean lock) {
 
-        if (this.mappedFile.hold()) {/*引用计数+1，查询期间 mf资源不能释放*/
+        if (this.mappedFile.hold()) {/*引用计数+1，查询期间 MappedFile资源不能释放*/
             /*获取 key的hash值*/
             int keyHash = indexKeyHashMethod(key);
             /*取模 计算出key hash对应 hash桶的下标值*/
@@ -286,9 +287,11 @@ public class IndexFile {
                             IndexHeader.INDEX_HEADER_SIZE + this.hashSlotNum * hashSlotSize
                                 + nextIndexToRead * indexSize;
 
-                        /*读取索引数据*/
+                        /*读取索引数据保存的key的hash值*/
                         int keyHashRead = this.mappedByteBuffer.getInt(absIndexPos);
+                        /*读出来的索引数据保存的消息的物理偏移量*/
                         long phyOffsetRead = this.mappedByteBuffer.getLong(absIndexPos + 4);
+                        /*读出来的索引数据保存的存储时间差*/
                         long timeDiff = (long) this.mappedByteBuffer.getInt(absIndexPos + 4 + 8);
                         int prevIndexRead = this.mappedByteBuffer.getInt(absIndexPos + 4 + 8 + 4);
 
@@ -304,18 +307,18 @@ public class IndexFile {
                         /*时间范围的匹配*/
                         boolean timeMatched = (timeRead >= begin) && (timeRead <= end);
 
-                        /*条件成立：说明查询命中，将消息索引的 消息偏移量 加入到 list集合中*/
+                        /*条件成立：说明查询命中，将消息索引的 消息物理偏移量 加入到 list集合中*/
                         if (keyHash == keyHashRead && timeMatched) {
                             phyOffsets.add(phyOffsetRead);
                         }
 
-                        /*判断 索引条目数据的 前驱索引 编号 是否是无效的... 无效跳出循环*/
+                        /*判断 索引条目数据的 前驱索引 编号 是否是无效的... 无效则跳出循环*/
                         if (prevIndexRead <= invalidIndex
                             || prevIndexRead > this.indexHeader.getIndexCount()
                             || prevIndexRead == nextIndexToRead || timeRead < begin) {
                             break;
                         }
-                        /*赋值给 nextIndexToRead ，继续向前查询，解决hash冲突！*/
+                        /*赋值给 nextIndexToRead ，继续向前查询！解决hash冲突！*/
                         nextIndexToRead = prevIndexRead;
                     }
                 }

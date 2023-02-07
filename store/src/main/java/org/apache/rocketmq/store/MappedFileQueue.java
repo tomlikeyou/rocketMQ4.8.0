@@ -43,7 +43,7 @@ public class MappedFileQueue {
     /*创建mappedFile的服务，内部有自己的线程，咱们通过向他提交 request，内部线程处理完后 会返回给我们结果，结果就是 MappedFile 对象*/
     private final AllocateMappedFileService allocateMappedFileService;
 
-    /*目录下的 刷盘位点（它的值：curMappedFile.fileName + curMappedFile.flushedPostion）*/
+    /*目录下的 刷盘位点（它的值：curMappedFile.fileName + curMappedFile.flushedPosition）*/
     private long flushedWhere = 0;
     private long committedWhere = 0;
     /*当前目录下最后一条msg存储时间*/
@@ -213,7 +213,7 @@ public class MappedFileQueue {
         long createOffset = -1;
         MappedFile mappedFileLast = getLastMappedFile();
 
-        /*情况1：list内没有mappedFile*/
+        /*情况1：list内没有mappedFile,也就是目录下面没有文件*/
         if (mappedFileLast == null) {
             /*createOffset 取值必须是 mappedFileSize的倍数 或者 0*/
             createOffset = startOffset - (startOffset % this.mappedFileSize);
@@ -366,7 +366,7 @@ public class MappedFileQueue {
      * @param deleteFilesInterval 删除两个文件之间的时间间隔
      * @param intervalForcibly mappedFile.destroy传递的参数
      * @param cleanImmediately true 强制删除 不考虑 expiredTime参数
-     * @return
+     * @return 返回成功删除的文件个数
      */
     public int deleteExpiredFileByTime(final long expiredTime,
         final int deleteFilesInterval,
@@ -423,9 +423,9 @@ public class MappedFileQueue {
 
     /**
      * consumeQueue 目录删除过期文件调用
-     * @param offset commitLog 目录下最小的物理偏移量
+     * @param offset commitLog 目录下最小的消息物理偏移量
      * @param unitSize consumeQueue文件内每个数据单元固定大小
-     * @return
+     * @return 成功删除的文件个数
      */
     public int deleteExpiredFileByOffset(long offset, int unitSize) {
         Object[] mfs = this.copyMappedFiles(0);

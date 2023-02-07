@@ -73,15 +73,15 @@ public class DefaultMessageStore implements MessageStore {
     private final ConcurrentMap<String/* topic */, ConcurrentMap<Integer/* queueId */, ConsumeQueue>> consumeQueueTable;
 
     private final FlushConsumeQueueService flushConsumeQueueService;
-
+    /*清理过期CommitLog文件*/
     private final CleanCommitLogService cleanCommitLogService;
 
     private final CleanConsumeQueueService cleanConsumeQueueService;
 
     private final IndexService indexService;
-
+    /*创建MappedFile服务，默认启用*/
     private final AllocateMappedFileService allocateMappedFileService;
-
+    /*消息分发服务，新消息保存到CommitLog文件之后，需要同步添加到消费队列文件跟索引文件，它就做个事情*/
     private final ReputMessageService reputMessageService;
 
     private final HAService haService;
@@ -167,6 +167,10 @@ public class DefaultMessageStore implements MessageStore {
         lockFile = new RandomAccessFile(file, "rw");
     }
 
+    /**
+     *
+     * @param phyOffset CommitLog目录下的准确无误的最大消息偏移量
+     */
     public void truncateDirtyLogicFiles(long phyOffset) {
         ConcurrentMap<String, ConcurrentMap<Integer, ConsumeQueue>> tables = DefaultMessageStore.this.consumeQueueTable;
 
@@ -1428,14 +1432,14 @@ public class DefaultMessageStore implements MessageStore {
     }
 
     private void addScheduleTask() {
-
+        /*延迟1分钟，每隔10秒执行一次 清理过期CommitLog文件任务*/
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
                 DefaultMessageStore.this.cleanFilesPeriodically();
             }
         }, 1000 * 60, this.messageStoreConfig.getCleanResourceInterval(), TimeUnit.MILLISECONDS);
-
+        /*延迟1分钟，每隔10分钟执行一次*/
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
@@ -1749,6 +1753,7 @@ public class DefaultMessageStore implements MessageStore {
 
         private void deleteExpiredFiles() {
             int deleteCount = 0;
+            /*CommitLog文件过期时长：默认72小时*/
             long fileReservedTime = DefaultMessageStore.this.getMessageStoreConfig().getFileReservedTime();
             int deletePhysicFilesInterval = DefaultMessageStore.this.getMessageStoreConfig().getDeleteCommitLogFilesInterval();
             int destroyMapedFileIntervalForcibly = DefaultMessageStore.this.getMessageStoreConfig().getDestroyMapedFileIntervalForcibly();
@@ -1918,9 +1923,14 @@ public class DefaultMessageStore implements MessageStore {
                 this.lastPhysicalMinOffset = minOffset;
 
                 ConcurrentMap<String, ConcurrentMap<Integer, ConsumeQueue>> tables = DefaultMessageStore.this.consumeQueueTable;
-
+                /*遍历全部的ConsumeQueue，执行删除过期消费队列文件*/
                 for (ConcurrentMap<Integer, ConsumeQueue> maps : tables.values()) {
                     for (ConsumeQueue logic : maps.values()) {
+                        /*删除文件的条件？
+                        * 遍历ConsumeQueue管理的每一个MappedFile文件，
+                        * 判断MappedFile文件中最后一条CQData数据的消息物理偏移量是否小于CommitLog最小的消息物理偏移量,
+                        * 小于则删除该MappedFile，并从MappedFile集合中移除出去
+                        * */
                         int deleteCount = logic.deleteExpiredFile(minOffset);
 
                         if (deleteCount > 0 && deleteLogicsFilesInterval > 0) {
@@ -1931,7 +1941,7 @@ public class DefaultMessageStore implements MessageStore {
                         }
                     }
                 }
-
+                /*删除过期索引文件*/
                 DefaultMessageStore.this.indexService.deleteExpiredFile(minOffset);
             }
         }
@@ -2012,6 +2022,7 @@ public class DefaultMessageStore implements MessageStore {
 
     class ReputMessageService extends ServiceThread {
 
+        /*分发位点*/
         private volatile long reputFromOffset = 0;
 
         public long getReputFromOffset() {

@@ -114,7 +114,7 @@ public class CommitLog {
     }
 
     public boolean load() {
-        /*调用mfq的load方法*/
+        /*调用MappedFileQueue的load方法*/
         boolean result = this.mappedFileQueue.load();
         log.info("load commit log " + (result ? "OK" : "Failed"));
         return result;
@@ -185,7 +185,7 @@ public class CommitLog {
     /**
      *
      * 上次关机属于正常关机时执行的 恢复方法
-     * @param maxPhyOffsetOfConsumeQueue （存储主模块先恢复的是 所有的 ConsumeQueue数据，在恢复的是 CommitLog数据
+     * @param maxPhyOffsetOfConsumeQueue （存储主模块先恢复的是 所有的 ConsumeQueue数据，再恢复的是 CommitLog数据
      *                                   maxPhyOffsetOfConsumeQueue 表示 恢复阶段 ConsumeQueue中 已知的 最大消息 offset）
      * When the normal exit, data recovery, all memory data have been flush
      */
@@ -267,7 +267,9 @@ public class CommitLog {
             // Clear ConsumeQueue redundant data
             if (maxPhyOffsetOfConsumeQueue >= processOffset) {
                 log.warn("maxPhyOffsetOfConsumeQueue({}) >= processOffset({}), truncate dirty logic files", maxPhyOffsetOfConsumeQueue, processOffset);
-                /*删除 consumeQueue下的脏文件*/
+                /*删除 consumeQueue下的脏文件
+                * 参数：CommitLog目录下的准确无误的最大消息偏移量
+                * */
                 this.defaultMessageStore.truncateDirtyLogicFiles(processOffset);
             }
         } else {
@@ -699,7 +701,8 @@ public class CommitLog {
                 case PUT_OK:
                     break;
                 case END_OF_FILE:
-                    unlockMappedFile = mappedFile;
+                    /*到文件尾了，*/
+                    unlockMappedFile = mappedFile   ;
                     // Create a new file, re-write the message
                     mappedFile = this.mappedFileQueue.getLastMappedFile(0);
                     if (null == mappedFile) {
@@ -744,7 +747,7 @@ public class CommitLog {
         storeStatsService.getSinglePutMessageTopicTimesTotal(msg.getTopic()).incrementAndGet();
         storeStatsService.getSinglePutMessageTopicSizeTotal(topic).addAndGet(result.getWroteBytes());
 
-        /*通知刷盘线程*/
+        /*添加消息成功后通知刷盘线程进行刷盘*/
         CompletableFuture<PutMessageStatus> flushResultFuture = submitFlushRequest(result, msg);
         /*HA 相关的...*/
         CompletableFuture<PutMessageStatus> replicaResultFuture = submitReplicaRequest(result, msg);

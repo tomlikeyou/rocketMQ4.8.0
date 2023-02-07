@@ -44,7 +44,7 @@ public class ConsumeQueue {
     /*一个临时缓冲区，用途：插入新的CQData 时 使用*/
     private final ByteBuffer byteBufferIndex;
 
-    /*目录，比如说：../store/xxx_topic/0*/
+    /*管理的目录，比如说：../store/xxx_topic/0*/
     private final String storePath;
     /*每一个ConsumeQueue存储文件大小，默认：20 *30w == 600w byte*/
     private final int mappedFileSize;
@@ -128,6 +128,7 @@ public class ConsumeQueue {
                             maxExtAddr = tagsCode;
                         }
                     } else {
+                        /*正常最终读到最后一条数据，从这里退出*/
                         log.info("recover current consume queue file over,  " + mappedFile.getFileName() + " "
                             + offset + " " + size + " " + tagsCode);
                         break;
@@ -149,6 +150,7 @@ public class ConsumeQueue {
                         log.info("recover next consume queue file, " + mappedFile.getFileName());
                     }
                 } else {
+                    //正常最终从这里退出
                     log.info("recover current consume queue queue over " + mappedFile.getFileName() + " "
                         + (processOffset + mappedFileOffset));
                     break;
@@ -156,8 +158,10 @@ public class ConsumeQueue {
             }
 
             processOffset += mappedFileOffset;
+            /*重写MappedFileQueue的刷盘位点*/
             this.mappedFileQueue.setFlushedWhere(processOffset);
             this.mappedFileQueue.setCommittedWhere(processOffset);
+            /*重写当前顺序写的mappedFile的刷盘位点*/
             this.mappedFileQueue.truncateDirtyFiles(processOffset);
 
             if (isExtReadEnable()) {
@@ -239,7 +243,7 @@ public class ConsumeQueue {
 
     /**
      * commitLog恢复阶段 调用，该方法主要将ConsumeQueue有效数据文件 跟 CommitLog 对齐，将超出部分的数据文件 删除掉。
-     * @param phyOffet ComitLog的准确无误的最大消息偏移量
+     * @param phyOffet CommitLog的准确无误的最大消息偏移量
      */
     public void truncateDirtyLogicFiles(long phyOffet) {
 
@@ -404,7 +408,7 @@ public class ConsumeQueue {
      */
     public void putMessagePositionInfoWrapper(DispatchRequest request) {
         final int maxRetries = 30;
-        /*获取 ConsumeQueue标记位状态，表示ConsumeQueue是否可写*/
+        /*获取 ConsumeQueue 标记位状态，表示ConsumeQueue是否可写*/
         boolean canWrite = this.defaultMessageStore.getRunningFlags().isCQWriteable();
         for (int i = 0; i < maxRetries && canWrite; i++) {
             /*获取消息 tagsCode*/
@@ -481,7 +485,7 @@ public class ConsumeQueue {
         this.byteBufferIndex.putInt(size);
         this.byteBufferIndex.putLong(tagsCode);
 
-        /*计算出在逻辑队列的 真实物理地址： 逻辑偏移量 * 20*/
+        /*计算出在逻辑队列consumeQueue内的 真实物理地址： 逻辑偏移量 * 20*/
         final long expectLogicOffset = cqOffset * CQ_STORE_UNIT_SIZE;
 
         /*根据 真实物理地址 获取对应的mappedFile文件*/
@@ -517,11 +521,11 @@ public class ConsumeQueue {
                     );
                 }
             }
-            /*expectLogicOffset == mf文件名 +mf.wrotePosiiton*/
+            /*expectLogicOffset == mf文件名 +mf.wrotePosition*/
 
             /*赋值新值；当前消息物理偏移量 + size大小*/
             this.maxPhysicOffset = offset + size;
-            /*将CQData数据 追加到mf文件内*/
+            /*将CQData数据 追加到MappedFile文件内*/
             return mappedFile.appendMessage(this.byteBufferIndex.array());
         }
         return false;

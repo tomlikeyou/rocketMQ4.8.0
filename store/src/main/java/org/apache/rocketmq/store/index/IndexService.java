@@ -94,7 +94,7 @@ public class IndexService {
 
     /**
      *
-     * @param offset commitLog内最早的消息 phyOffset
+     * @param offset commitLog内最早的消息物理偏移量 phyOffset
      */
     public void deleteExpiredFile(long offset) {
         Object[] files = null;
@@ -131,11 +131,17 @@ public class IndexService {
         }
     }
 
+    /**
+     *
+     * @param files 待删除的索引文件集合
+     */
     private void deleteExpiredFile(List<IndexFile> files) {
         if (!files.isEmpty()) {
             try {
+                /*获取写锁*/
                 this.readWriteLock.writeLock().lock();
                 for (IndexFile file : files) {
+                    /*删除IndexFile*/
                     boolean destroyed = file.destroy(3000);
                     destroyed = destroyed && this.indexFileList.remove(file);
                     if (!destroyed) {
@@ -210,12 +216,12 @@ public class IndexService {
     }
 
     /**
-     * 上层 DefaultMessageStore 内部启动的 异步线程 会 将commitLog 内的 新msg 给包装成 DispatchRequest
+     * 上层 DefaultMessageStore对象 内部启动的 异步线程 会 将commitLog文件 内的 新msg 给包装成 DispatchRequest
      * 最终交给当前方法
-     * @param req 类似于msg，只不过没有body字段
+     * @param req 类似于msg，只不过没有body字段信息
      */
     public void buildIndex(DispatchRequest req) {
-        /*获取当前 索引文件，如果list内 不存在file 或者当前 file 已经写满的话，则创建一个 新的 file*/
+        /*获取当前 索引文件，如果list内 不存在IndexFile文件 或者当前 IndexFile文件 已经写满的话，则创建一个 新的 IndexFile文件*/
         IndexFile indexFile = retryGetAndCreateIndexFile();
 
         if (indexFile != null) {

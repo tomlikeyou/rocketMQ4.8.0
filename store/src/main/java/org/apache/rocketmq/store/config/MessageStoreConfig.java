@@ -63,7 +63,7 @@ public class MessageStoreConfig {
     private boolean flushCommitLogTimed = false;
     // ConsumeQueue flush interval
     private int flushIntervalConsumeQueue = 1000;
-    // Resource reclaim interval
+    // Resource reclaim interval 10s
     private int cleanResourceInterval = 10000;
     // CommitLog removal interval
     private int deleteCommitLogFilesInterval = 100;

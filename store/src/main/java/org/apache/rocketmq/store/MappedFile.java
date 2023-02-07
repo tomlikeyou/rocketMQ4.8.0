@@ -60,8 +60,10 @@ public class MappedFile extends ReferenceResource {
     protected FileChannel fileChannel;
     /**
      * Message will put to here first, and then reput to FileChannel if writeBuffer is not null.
+     * 堆外内存，如果不为空，数据会先保存到这里，然后再保存到 MappedFile创建的fileChannel通道中
      */
     protected ByteBuffer writeBuffer = null;
+    /*堆外内存池*/
     protected TransientStorePool transientStorePool = null;
     /*文件名 （commitLog、ConsumeQueue：文件名就是 第一条消息的 物理偏移量 索引文件：年月日小时分钟秒...）*/
     private String fileName;
@@ -87,6 +89,15 @@ public class MappedFile extends ReferenceResource {
         init(fileName, fileSize);
     }
 
+    /**
+     *
+     * @param fileName 文件名称（绝对路径文件名称）
+     * @param fileSize 文件大小
+     * @param transientStorePool 临时堆外内存池（存放临时的数据，如果开启了堆外内存池，数据会先写入到堆外内存，
+     *                           再通过 commit 定时线程将数据复制到与目标物理文件对应的内存映射中。
+     *                           RocketMQ 引入该机制主要的原因是提供一种内存锁定，让内存一直被RocketMQ 占用，不会被交换至磁盘中。）
+     * @throws IOException
+     */
     public MappedFile(final String fileName, final int fileSize,
         final TransientStorePool transientStorePool) throws IOException {
         init(fileName, fileSize, transientStorePool);
@@ -159,7 +170,9 @@ public class MappedFile extends ReferenceResource {
     public void init(final String fileName, final int fileSize,
         final TransientStorePool transientStorePool) throws IOException {
         init(fileName, fileSize);
+        /*保存写缓冲区*/
         this.writeBuffer = transientStorePool.borrowBuffer();
+        /*保存堆外内存池*/
         this.transientStorePool = transientStorePool;
     }
 
@@ -214,7 +227,7 @@ public class MappedFile extends ReferenceResource {
     /**
      *
      * @param msg 消息
-     * @param cb 追加消息回调（消息那些个字段 需要追加到 文件中，都由它控制）
+     * @param cb 追加消息回调（消息哪些个字段 需要追加到 文件中，都由它控制）
      * @return
      */
     public AppendMessageResult appendMessage(final MessageExtBrokerInner msg, final AppendMessageCallback cb) {
@@ -506,10 +519,12 @@ public class MappedFile extends ReferenceResource {
 
         if (this.isCleanupOver()) {
             try {
+                /*关闭文件通道*/
                 this.fileChannel.close();
                 log.info("close file channel " + this.fileName + " OK");
 
                 long beginTime = System.currentTimeMillis();
+                /*删除文件*/
                 boolean result = this.file.delete();
                 log.info("delete file[REF:" + this.getRefCount() + "] " + this.fileName
                     + (result ? " OK, " : " Failed, ") + "W:" + this.getWrotePosition() + " M:"

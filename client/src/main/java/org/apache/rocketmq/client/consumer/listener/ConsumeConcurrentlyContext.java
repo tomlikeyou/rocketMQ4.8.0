@@ -22,8 +22,10 @@ import org.apache.rocketmq.common.message.MessageQueue;
  * Consumer concurrent consumption context
  */
 public class ConsumeConcurrentlyContext {
+    /*消息队列*/
     private final MessageQueue messageQueue;
     /**
+     * 该值控制Broker延迟级别（只有消费失败时才有作用）
      * Message consume retry strategy<br>
      * -1,no retry,put into DLQ directly<br>    死信队列
      * 0,broker control retry frequency<br>     服务端控制延迟级别

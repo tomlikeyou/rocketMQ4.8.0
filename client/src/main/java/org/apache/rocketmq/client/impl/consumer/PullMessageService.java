@@ -29,9 +29,10 @@ import org.apache.rocketmq.common.utils.ThreadUtils;
 
 public class PullMessageService extends ServiceThread {
     private final InternalLogger log = ClientLogger.getLog();
-    /*pullRequest对象 拉消息请求的阻塞队列*/
+    /*pullRequest对象 拉消息请求的阻塞任务队列*/
     private final LinkedBlockingQueue<PullRequest> pullRequestQueue = new LinkedBlockingQueue<PullRequest>();
     private final MQClientInstance mQClientFactory;
+    /*单线程的调度线程池,主要用于延迟指定时长 向拉请求的阻塞任务队列提交一个拉请求*/
     private final ScheduledExecutorService scheduledExecutorService = Executors
         .newSingleThreadScheduledExecutor(new ThreadFactory() {
             @Override
@@ -93,7 +94,9 @@ public class PullMessageService extends ServiceThread {
 
         while (!this.isStopped()) {
             try {
+                /*从阻塞队列中获取一个拉消息请求*/
                 PullRequest pullRequest = this.pullRequestQueue.take();
+                /*处理拉消息请求*/
                 this.pullMessage(pullRequest);
             } catch (InterruptedException ignored) {
             } catch (Exception e) {

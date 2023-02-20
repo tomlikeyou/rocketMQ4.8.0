@@ -52,14 +52,17 @@ public class ScheduleMessageService extends ConfigManager {
     private static final long DELAY_FOR_A_WHILE = 100L;
     private static final long DELAY_FOR_A_PERIOD = 10000L;
 
-    /*table 存储延迟级别 对应的 延迟时间长度（单位：毫秒）*/
+    /*存储延迟级别 对应的 延迟时间长度（单位：毫秒）*/
     private final ConcurrentMap<Integer /* level */, Long/* delay timeMillis */> delayLevelTable =
         new ConcurrentHashMap<Integer, Long>(32);
 
-    /*table 存储 延迟级别对应的queue的 消费进度 offset（该table 每10秒钟，会持久化一次，持久化到本地磁盘）*/
+    /*存储 延迟级别对应的消费队列的消费进度（该table 每10秒钟，会持久化一次，持久化到本地磁盘）*/
     private final ConcurrentMap<Integer /* level */, Long/* offset */> offsetTable =
         new ConcurrentHashMap<Integer, Long>(32);
+
+    /*存储主模块*/
     private final DefaultMessageStore defaultMessageStore;
+
     /*模块启动状态*/
     private final AtomicBoolean started = new AtomicBoolean(false);
     /*定时器 内部有线程资源，可执行调度任务*/
@@ -123,9 +126,11 @@ public class ScheduleMessageService extends ConfigManager {
 
             /*为每个延迟级别，创建一个 “延迟队列任务” 提交到timer，延迟1秒后执行*/
             for (Map.Entry<Integer, Long> entry : this.delayLevelTable.entrySet()) {
+                /*延迟级别*/
                 Integer level = entry.getKey();
+                /*延迟级别对应的延迟时长*/
                 Long timeDelay = entry.getValue();
-                /*根据延迟级别 获取对应的queue的消费进度*/
+                /*根据延迟级别 获取对应的消费队列的消费进度*/
                 Long offset = this.offsetTable.get(level);
                 if (null == offset) {
                     offset = 0L;
@@ -245,9 +250,9 @@ public class ScheduleMessageService extends ConfigManager {
     }
 
     class DeliverDelayedMessageTimerTask extends TimerTask {
-        /*延迟队列任务处理的延迟级别*/
+        /*延迟队列任务处理的 延迟级别*/
         private final int delayLevel;
-        /*延迟队列任务处理的延迟队列的 消费进度*/
+        /*延迟队列任务处理的 延迟消费队列的 消费进度*/
         private final long offset;
 
         public DeliverDelayedMessageTimerTask(int delayLevel, long offset) {
@@ -288,7 +293,10 @@ public class ScheduleMessageService extends ConfigManager {
         }
 
         public void executeOnTimeup() {
-            /*获取出该延迟队列任务处理的延迟队列 ConsumeQueue 指定延迟主题 queueId（延迟级别-1）*/
+            /*获取出该延迟队列任务处理的延迟队列 ConsumeQueue 指定延迟主题 queueId（延迟级别-1）
+            * 参数1：延迟主题：SCHEDULE_TOPIC_XXXX
+            * 参数2：延迟级别对应的延迟消费队列ID
+            * */
             ConsumeQueue cq =
                 ScheduleMessageService.this.defaultMessageStore.findConsumeQueue(TopicValidator.RMQ_SYS_SCHEDULE_TOPIC,
                     delayLevel2QueueId(delayLevel));
@@ -296,7 +304,7 @@ public class ScheduleMessageService extends ConfigManager {
             long failScheduleOffset = offset;
 
             if (cq != null) {
-                /*根据 消费进度 查询出 SMBR对象*/
+                /*根据 消费进度 查询出 SelectMappedBufferResult 对象*/
                 SelectMappedBufferResult bufferCQ = cq.getIndexBuffer(this.offset);
                 if (bufferCQ != null) {
                     try {
@@ -345,7 +353,7 @@ public class ScheduleMessageService extends ConfigManager {
 
                                 if (msgExt != null) {
                                     try {
-                                        /*根据延迟消息，重新建一条消息，字段大多数copy过滤，修改了主题跟 queueId*/
+                                        /*根据延迟消息，重新建一条消息，字段大多数copy过滤，修改了主题跟 队列ID*/
                                         MessageExtBrokerInner msgInner = this.messageTimeup(msgExt);
                                         if (TopicValidator.RMQ_SYS_TRANS_HALF_TOPIC.equals(msgInner.getTopic())) {
                                             log.error("[BUG] the real topic of schedule msg is {}, discard the msg. msg={}",
@@ -353,7 +361,7 @@ public class ScheduleMessageService extends ConfigManager {
                                             continue;
                                         }
                                         /*将新消息 存储到 commitLog（最终 ReputMessageService 会向 目标主题的 ConsumeQueue 中 添加 CQData）
-                                        * 作为消费者 订阅的是 目标主题，所以会再次消费该消息
+                                        * 作为消费者 默认都会订阅 重试主题，所以会再次消费该消息
                                         * */
                                         PutMessageResult putMessageResult =
                                             ScheduleMessageService.this.writeMessageStore
@@ -393,7 +401,7 @@ public class ScheduleMessageService extends ConfigManager {
                                 ScheduleMessageService.this.timer.schedule(
                                     new DeliverDelayedMessageTimerTask(this.delayLevel, nextOffset),
                                     countdown);
-                                /*更新 延迟级别的延迟队列的消费进度*/
+                                /*更新 延迟级别对应的消费队列的消费进度*/
                                 ScheduleMessageService.this.updateOffset(this.delayLevel, nextOffset);
                                 return;
                             }
@@ -446,13 +454,13 @@ public class ScheduleMessageService extends ConfigManager {
             msgInner.setReconsumeTimes(msgExt.getReconsumeTimes());
 
             msgInner.setWaitStoreMsgOK(false);
-            /*清理新消息的 delay属性，为什么要清理呢？ 不清理的话 回头存储时又被转发到 调度延迟主题（SCHEDULE_TOPIC_XXXX主题）了*/
+            /*清理新消息的延迟级别属性，为什么要清理呢？ 不清理的话 该消息回头存储时发现延迟级别大于0 又被转发到 延迟主题（SCHEDULE_TOPIC_XXXX主题）了*/
             MessageAccessor.clearProperty(msgInner, MessageConst.PROPERTY_DELAY_TIME_LEVEL);
 
-            /*修改主题为重试主题 %RETRY%GroupName */
+            /*修改主题为重试主题 %RETRY%消费者组名 */
             msgInner.setTopic(msgInner.getProperty(MessageConst.PROPERTY_REAL_TOPIC));
 
-            /*修改队列为 0*/
+            /*修改队列ID为 0*/
             String queueIdStr = msgInner.getProperty(MessageConst.PROPERTY_REAL_QUEUE_ID);
             int queueId = Integer.parseInt(queueIdStr);
             msgInner.setQueueId(queueId);

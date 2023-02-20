@@ -635,20 +635,21 @@ public class CommitLog {
         if (tranType == MessageSysFlag.TRANSACTION_NOT_TYPE
                 || tranType == MessageSysFlag.TRANSACTION_COMMIT_TYPE) {
 
-            /*这个代码块 说明消息设置了 延迟级别属性，这里会偷梁换柱，将消息的主题跟queueId给换成 调度延迟主题（SCHEDULE_TOPIC_XXXX） 延迟级别-1*/
+            /*这个代码块 说明消息设置了 延迟级别属性，这里会偷梁换柱，将消息的主题跟队列ID给换成 调度延迟主题（SCHEDULE_TOPIC_XXXX） 延迟级别-1*/
             // Delay Delivery
             if (msg.getDelayTimeLevel() > 0) {
 
+                /*如果消息的延迟级别超过了默认配置的最大延迟级别，重置延迟级别*/
                 if (msg.getDelayTimeLevel() > this.defaultMessageStore.getScheduleMessageService().getMaxDelayLevel()) {
                     msg.setDelayTimeLevel(this.defaultMessageStore.getScheduleMessageService().getMaxDelayLevel());
                 }
 
                 /* SCHEDULE_TOPIC_XXXX */
                 topic = TopicValidator.RMQ_SYS_SCHEDULE_TOPIC;
-                /*延迟调度主题的 queueId为 延迟级别 -1 */
+                /*延迟调度主题的 队列ID为 延迟级别 -1 */
                 queueId = ScheduleMessageService.delayLevel2QueueId(msg.getDelayTimeLevel());
 
-                /*将消息的 “topic” %RETRY%GroupName queueId 0 记录到消息的属性中
+                /*将消息的 “topic” %RETRY%消费者组名 队列ID 0 记录到消息的属性中
                 * key：“REAL_TOPIC” "REAL_QUEUE_ID"
                 * */
                 // Backup real topic, queueId
@@ -898,7 +899,9 @@ public class CommitLog {
                     msg.setDelayTimeLevel(this.defaultMessageStore.getScheduleMessageService().getMaxDelayLevel());
                 }
 
+                /*延迟主题：SCHEDULE_TOPIC_XXXX*/
                 topic = TopicValidator.RMQ_SYS_SCHEDULE_TOPIC;
+                /*根据延迟级别计算出的消费队列ID*/
                 queueId = ScheduleMessageService.delayLevel2QueueId(msg.getDelayTimeLevel());
 
                 // Backup real topic, queueId
@@ -908,7 +911,7 @@ public class CommitLog {
 
                 /*修改主题*/
                 msg.setTopic(topic);
-                /*修改queueId*/
+                /*修改队列ID*/
                 msg.setQueueId(queueId);
             }
         }

@@ -85,7 +85,7 @@ public class DefaultMessageStore implements MessageStore {
     private final ReputMessageService reputMessageService;
 
     private final HAService haService;
-
+    /*调度消息服务*/
     private final ScheduleMessageService scheduleMessageService;
 
     private final StoreStatsService storeStatsService;
@@ -144,8 +144,9 @@ public class DefaultMessageStore implements MessageStore {
         } else {
             this.haService = null;
         }
+        /*创建一个消息分发服务*/
         this.reputMessageService = new ReputMessageService();
-
+        /*创建一个调度消息服务*/
         this.scheduleMessageService = new ScheduleMessageService(this);
 
         this.transientStorePool = new TransientStorePool(messageStoreConfig);
@@ -192,6 +193,7 @@ public class DefaultMessageStore implements MessageStore {
             boolean lastExitOK = !this.isTempFileExist();
             log.info("last shutdown {}", lastExitOK ? "normally" : "abnormally");
 
+            /*加载调度消息服务*/
             if (null != scheduleMessageService) {
                 result = result && this.scheduleMessageService.load();
             }
@@ -565,9 +567,9 @@ public class DefaultMessageStore implements MessageStore {
      *
      * @param group 消费者组
      * @param topic 主题
-     * @param queueId queueId
+     * @param queueId queueId 队列ID
      * @param offset 客户端拉消息使用的开始位点
-     * @param maxMsgNums 32
+     * @param maxMsgNums 32 本次最多可以拉取多少消息
      * @param messageFilter 一般这里是 tagCode 过滤，在服务器这里
      * @return
      */
@@ -597,14 +599,14 @@ public class DefaultMessageStore implements MessageStore {
         long minOffset = 0;
         long maxOffset = 0;
 
-        /*查询结果对象*/
+        /*创建查询结果对象*/
         GetMessageResult getResult = new GetMessageResult();
 
-        /*获取commitLog的最大物理偏移量：当前正在顺序写的 mf文件 文件名 long值 + 顺序写文件的 position*/
+        /*获取commitLog的最大物理偏移量：当前正在顺序写的 mappedFile文件 文件名 long值 + 顺序写文件的 position*/
         final long maxOffsetPy = this.commitLog.getMaxOffset();
 
-        /*看源码得知，该方法不会返回null，会拿到指定主题指定queueId的 ConsumeQueue对象
-        * （它是管理队列文件，存的是CQData(1.offsetPy 2.size 3.tagCode)）
+        /*看源码得知，该方法不会返回null，会拿到指定主题指定队列ID的 ConsumeQueue对象
+        * （它是管理消费队列文件，存的是CQData(1.offsetPy（commitlog目录下的消息物理偏移量） 2.size（消息大小） 3.tagCode)）
         * */
         ConsumeQueue consumeQueue = findConsumeQueue(topic, queueId);
 
@@ -628,7 +630,7 @@ public class DefaultMessageStore implements MessageStore {
                 status = GetMessageStatus.OFFSET_TOO_SMALL;
                 nextBeginOffset = nextOffsetCorrection(offset, minOffset);
             } else if (offset == maxOffset) {
-                /*说明客户端 消费进度跟 该queue的 消息进度 持平了...
+                /*说明客户端 消费进度跟 该消费队列的 最大消息偏移量 持平了...
                 * PullMessageProcessor 会进行长轮询的逻辑
                 * */
                 status = GetMessageStatus.OFFSET_OVERFLOW_ONE;
@@ -644,10 +646,10 @@ public class DefaultMessageStore implements MessageStore {
                     nextBeginOffset = nextOffsetCorrection(offset, maxOffset);
                 }
             } else {
-                /*执行到这里 说明 pullRequest.offset 是满足 ConsumeQueue有效数据范围的offset*/
+                /*执行到这里 说明 拉请求pullRequest.offset 是满足 ConsumeQueue有效数据范围的offset*/
 
 
-                /*根据 offset 查询 CQData数据，CQData数据由 smbr 表示，smbr内部有 byteBuffer
+                /*根据 offset 查询 CQData数据，CQData数据由 SelectMappedBufferResult 表示，SelectMappedBufferResult内部有 byteBuffer
                 * bufferConsumeQueue 数据范围：
                 * 1、如果offset命中的文件不是 正在顺序写的文件的话 [offset表示的这条消息，文件尾]
                 * 2、如果offset命中的文件是 正在顺序写的文件的话 [offset表示的这条消息，文件名+wrotePosition]
@@ -724,7 +726,7 @@ public class DefaultMessageStore implements MessageStore {
                                 }
                             }
 
-                            /*服务器端 按照tagCode 进行消息过滤*/
+                            /*服务器端 按照tagCode 对查询到的CQData进行消息过滤*/
                             if (messageFilter != null
                                 && !messageFilter.isMatchedByConsumeQueue(isTagsCodeLegal ? tagsCode : null, extRet ? cqExtUnit : null)) {
                                 if (getResult.getBufferTotalSize() == 0) {
@@ -814,13 +816,13 @@ public class DefaultMessageStore implements MessageStore {
         long elapsedTime = this.getSystemClock().now() - beginTime;
         this.storeStatsService.setGetMessageEntireTimeMax(elapsedTime);
 
-        /*设置结果状态*/
+        /*设置查询结果状态*/
         getResult.setStatus(status);
-        /*设置客户端下一次pull时的offset*/
+        /*设置客户端下一次pull拉时的offset*/
         getResult.setNextBeginOffset(nextBeginOffset);
-        /*设置queue的最大offset*/
+        /*设置queue消息队列消息队列的最大offset*/
         getResult.setMaxOffset(maxOffset);
-        /*设置queue的最小offset*/
+        /*设置queue消息队列的最小offset*/
         getResult.setMinOffset(minOffset);
         return getResult;
     }

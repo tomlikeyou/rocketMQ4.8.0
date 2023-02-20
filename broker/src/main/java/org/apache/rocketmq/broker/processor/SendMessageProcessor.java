@@ -118,7 +118,7 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
     }
 
     /**
-     * broker处理消息回退的逻辑 ：
+     * Broker处理消息回退的逻辑 ：
      * 1. 根据要重试的消息的 commitLog的物理偏移量从存储模块获取对应的 msg
      * 2.拷贝出一个新的消息，设置重试主题/死信主题、queueId、延迟级别（第一次消息回退 延迟级别为3 每重试一次 延迟级别+1）、原始消息主题、原始消息id、重试次数
      * 3.调用存储模块 将新的msg保存到commitLog中
@@ -171,11 +171,11 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
             return CompletableFuture.completedFuture(response);
         }
 
-        /*获取消费者组的重试主题：规则：%RETRY%GroupName*/
+        /*获取消费者组的重试主题：规则：%RETRY%消费者组名*/
         String newTopic = MixAll.getRetryTopic(requestHeader.getGroup());
 
 
-        /*计算重试主题下的 queueId，这里计算出来的 一般都是 0*/
+        /*计算重试主题下的 队列ID，这里计算出来的 一般都是 0*/
         int queueIdInt = Math.abs(this.random.nextInt() % 99999999) % subscriptionGroupConfig.getRetryQueueNums();
 
         int topicSysFlag = 0;
@@ -202,6 +202,7 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
 
         /*从存储模块根据 消息的物理offset 查询出该条消息，内部先查询出这条消息的size，然后再根据 offset和 size查询出整条msg*/
         MessageExt msgExt = this.brokerController.getMessageStore().lookMessageByOffset(requestHeader.getOffset());
+
         if (null == msgExt) {
             /*未查询到“需要回退处理”的消息，返回系统错误*/
             response.setCode(ResponseCode.SYSTEM_ERROR);
@@ -231,10 +232,10 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
             maxReconsumeTimes = requestHeader.getMaxReconsumeTimes();
         }
 
-        /*条件成立：说明消息不支持再重试了，需要将该消息转入到 “死信”主题*/
+        /*条件成立：说明消息不支持再重试了，需要将该消息转入到 “死信队列”主题*/
         if (msgExt.getReconsumeTimes() >= maxReconsumeTimes 
             || delayLevel < 0) {
-            /*获取消费者组的死信主题，规则：%DLQ%GroupName*/
+            /*获取消费者组的死信主题，规则：%DLQ%消费者组名*/
             newTopic = MixAll.getDLQTopic(requestHeader.getGroup());
             /*获取死信主题队列id：0*/
             queueIdInt = Math.abs(this.random.nextInt() % 99999999) % DLQ_NUMS_PER_GROUP;
@@ -271,7 +272,7 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
         msgInner.setPropertiesString(MessageDecoder.messageProperties2String(msgExt.getProperties()));
         msgInner.setTagsCode(MessageExtBrokerInner.tagsString2tagsCode(null, msgExt.getTags()));
 
-        /*queueID为 “重试主题” 或者 “死信主题”的 queueId*/
+        /*队列ID为 “重试主题” 或者 “死信队列主题”的 队列ID*/
         msgInner.setQueueId(queueIdInt);
         msgInner.setSysFlag(msgExt.getSysFlag());
         msgInner.setBornTimestamp(msgExt.getBornTimestamp());

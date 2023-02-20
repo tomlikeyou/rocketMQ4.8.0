@@ -30,11 +30,11 @@ public class PullRequest {
     private final long timeoutMillis;
     /*长轮询开始时间*/
     private final long suspendTimestamp;
-    /*requestCommand header 提取出来的 本次pull队列的offset*/
+    /*requestCommand header 提取出来的 本次拉队列的开始偏移量*/
     private final long pullFromThisOffset;
     /*该主题的订阅数据*/
     private final SubscriptionData subscriptionData;
-    /*消息过滤器，一般都是tagCode过滤*/
+    /*消息过滤器，broker端一般都是tagCode过滤*/
     private final MessageFilter messageFilter;
 
     public PullRequest(RemotingCommand requestCommand, Channel clientChannel, long timeoutMillis, long suspendTimestamp,

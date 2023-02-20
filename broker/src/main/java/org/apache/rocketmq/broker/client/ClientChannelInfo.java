@@ -20,7 +20,9 @@ import io.netty.channel.Channel;
 import org.apache.rocketmq.remoting.protocol.LanguageCode;
 
 public class ClientChannelInfo {
+    /*客户端与broker服务端通信的netty通道*/
     private final Channel channel;
+    /*客户端id*/
     private final String clientId;
     private final LanguageCode language;
     private final int version;

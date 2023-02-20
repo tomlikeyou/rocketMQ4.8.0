@@ -23,7 +23,7 @@ import org.apache.rocketmq.remoting.annotation.CFNullable;
 import org.apache.rocketmq.remoting.exception.RemotingCommandException;
 
 public class ConsumerSendMsgBackRequestHeader implements CommandCustomHeader {
-    /*回退消息的 在commitLog的offset*/
+    /*回退消息的 在commitLog的物理偏移量*/
     @CFNotNull
     private Long offset;
     /*消费者组*/

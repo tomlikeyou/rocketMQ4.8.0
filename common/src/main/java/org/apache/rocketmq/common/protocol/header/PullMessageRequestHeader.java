@@ -38,16 +38,21 @@ public class PullMessageRequestHeader implements CommandCustomHeader {
     /*队列id*/
     @CFNotNull
     private Integer queueId;
+    /*拉消息开始偏移量*/
     @CFNotNull
     private Long queueOffset;
+    /*一次拉取消息数量最大值*/
     @CFNotNull
     private Integer maxMsgNums;
     @CFNotNull
     private Integer sysFlag;
+    /*消费者本地该队列的消费进度*/
     @CFNotNull
     private Long commitOffset;
+    /*服务端长轮询最大时长*/
     @CFNotNull
     private Long suspendTimeoutMillis;
+    /*消费者的主题订阅信息，一般为null*/
     @CFNullable
     private String subscription;
     @CFNotNull

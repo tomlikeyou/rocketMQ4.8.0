@@ -44,18 +44,19 @@ public abstract class RebalanceImpl {
     protected static final InternalLogger log = ClientLogger.getLog();
     /*分配到当前消费者的队列信息，key:messageQueue，value：processQueue（队列在消费者端的快照）*/
     protected final ConcurrentMap<MessageQueue, ProcessQueue> processQueueTable = new ConcurrentHashMap<MessageQueue, ProcessQueue>(64);
-    /*主题队列分布信息，key：topic*/
+
+    /*主题队列分布信息，记录着一个主题包含哪些队列信息，每个队列信息分布在哪个broker上、队列ID是多少；key：topic，value：队列信息*/
     protected final ConcurrentMap<String/* topic */, Set<MessageQueue>> topicSubscribeInfoTable =
         new ConcurrentHashMap<String, Set<MessageQueue>>();
 
-    /*消费者订阅信息，key：topic，value：消费者主题订阅信息*/
+    /*消费者主题订阅信息，key：topic 主题，value：主题订阅信息*/
     protected final ConcurrentMap<String /* topic */, SubscriptionData> subscriptionInner =
         new ConcurrentHashMap<String, SubscriptionData>();
     /*消费者组*/
     protected String consumerGroup;
     /*消费模式*/
     protected MessageModel messageModel;
-    /*分配策略*/
+    /*分配策略,在消费者启动阶段，初始化rbl对象时候，将消费者门面对象的队列分配策略传递了进来*/
     protected AllocateMessageQueueStrategy allocateMessageQueueStrategy;
 
     protected MQClientInstance mQClientFactory;
@@ -244,9 +245,10 @@ public abstract class RebalanceImpl {
      * @param isOrder （是否为顺序消费）
      */
     public void doRebalance(final boolean isOrder) {
-        /*获取消费者 订阅信息数据*/
+        /*获取消费者 主题订阅信息数据*/
         Map<String, SubscriptionData> subTable = this.getSubscriptionInner();
         if (subTable != null) {
+            /*遍历每一个主题*/
             for (final Map.Entry<String, SubscriptionData> entry : subTable.entrySet()) {
                 /*订阅的主题*/
                 final String topic = entry.getKey();
@@ -293,10 +295,10 @@ public abstract class RebalanceImpl {
             }
             /*集群模式*/
             case CLUSTERING: {
-                /*获取“主题”队列分布信息*/
+                /*获取当前主题对应的队列分布信息*/
                 Set<MessageQueue> mqSet = this.topicSubscribeInfoTable.get(topic);
 
-                /*获取消费者组客户端 id集合（从服务器获取）*/
+                /*获取消费者组客户端 id集合（从broker服务器获取）*/
                 List<String> cidAll = this.mQClientFactory.findConsumerIdList(topic, consumerGroup);
 
                 if (null == mqSet) {
@@ -312,7 +314,7 @@ public abstract class RebalanceImpl {
                 if (mqSet != null && cidAll != null) {
                     List<MessageQueue> mqAll = new ArrayList<MessageQueue>();
                     mqAll.addAll(mqSet);
-                    /*队列排序*/
+                    /*消息队列排序*/
                     Collections.sort(mqAll);
                     /*客户端id排序*/
                     Collections.sort(cidAll);
@@ -349,7 +351,7 @@ public abstract class RebalanceImpl {
 
                     /*最核心的方法
                     * 参数1：订阅主题
-                    * 参数2：分配给当前消费者的结果
+                    * 参数2：分配给当前消费者的消息队列结果
                     * 参数3：是否有序
                     * 返回值：boolean：true：表示 分配给当前消费者的队列发生变化，false表示 无变化。
                     * */
@@ -388,7 +390,7 @@ public abstract class RebalanceImpl {
 
     /**
      * 参数1：订阅主题
-     * 参数2：分配给当前消费者的结果
+     * 参数2：分配给当前消费者的消息队列结果
      * 参数3：是否有序
      * @return boolean：true：表示 分配给当前消费者的队列发生变化，false表示 无变化。
      */
@@ -408,10 +410,10 @@ public abstract class RebalanceImpl {
             if (mq.getTopic().equals(topic)) {
                 /*条件成立：mqSet是最新分配给当前消费者的（指定主题） 不包含 mq，说明该 mq 经过rbl计算之后，被分配到其他consumer节点了....*/
                 if (!mqSet.contains(mq)) {
-                    /*将该mq的pq删除状态设置为true，消费任务会一直检查该状态，如果该状态 变为 删除状态，消费任务会立马退出...*/
+                    /*将该mq的processQueue删除状态设置为true，消费任务会一直检查该状态，如果该状态 变为 删除状态，消费任务会立马退出...*/
                     pq.setDropped(true);
 
-                    /**/
+                    /*持久化该mq消息队列的消费进度到broker + 删除本地该mq的消费进度（从消费进度存储器当中）*/
                     if (this.removeUnnecessaryMessageQueue(mq, pq)) {
                         /*从 processQueueTable 中 移除该kv*/
                         it.remove();
@@ -432,7 +434,7 @@ public abstract class RebalanceImpl {
                             pq.setDropped(true);
                             /*将当前mq相关的信息移除
                             * 1、消费进度持久化
-                            * 2、当前mq的offset从offsetStore中删除
+                            * 2、当前mq的offset从offsetStore消费进度存储器中删除
                             * */
                             if (this.removeUnnecessaryMessageQueue(mq, pq)) {
                                 /*从 processQueueTable 中 移除该kv*/
@@ -451,13 +453,13 @@ public abstract class RebalanceImpl {
             }
         }
 
-        /*拉消息请求列表（最终将他交给 PullMessageService的队列内）*/
+        /*拉消息请求列表（最终将他交给 PullMessageService拉消息服务的队列内）*/
         List<PullRequest> pullRequestList = new ArrayList<PullRequest>();
 
 
         for (MessageQueue mq : mqSet) {
 
-            /*条件成立：说明当前mq是 rbl之后 新分配给当前消费者的 队列*/
+            /*条件成立：说明当前mq是 负载均衡之后 新分配给当前消费者的 队列*/
             if (!this.processQueueTable.containsKey(mq)) {
 
                 /*顺序消费，首先需要获取新分配的队列的 分布式锁！*/
@@ -470,7 +472,7 @@ public abstract class RebalanceImpl {
                 /*删除冗余 数据（脏数据）offset*/
                 this.removeDirtyOffset(mq);
 
-                /*为新分配到当前消费者的 队列创建 pq（快照队列）*/
+                /*为新分配到当前消费者的 队列创建 processQueue（快照队列）*/
                 ProcessQueue pq = new ProcessQueue();
                 /*从服务器拉取mq的消费进度*/
                 long nextOffset = this.computePullFromWhere(mq);

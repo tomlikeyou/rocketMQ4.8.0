@@ -107,7 +107,7 @@ public class PullRequestHoldService extends ServiceThread {
                 String topic = kArray[0];
                 /*queueId*/
                 int queueId = Integer.parseInt(kArray[1]);
-                /*到存储模块查询该 consumerQueue的最大offset*/
+                /*到存储模块查询该 consumerQueue消息队列的最大offset*/
                 final long offset = this.brokerController.getMessageStore().getMaxOffsetInQueue(topic, queueId);
                 try {
                     /*通知消息到达的逻辑

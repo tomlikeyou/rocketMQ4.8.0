@@ -31,10 +31,11 @@ public class SubscriptionData implements Comparable<SubscriptionData> {
     private boolean classFilterMode = false;
     /*主题*/
     private String topic;
-    /*具体存放tag信息*/
+    /*具体存放tag信息 比如： “aa bb cc”*/
     private String subString;
+    /*tags集合*/
     private Set<String> tagsSet = new HashSet<String>();
-    /*tag的hashCode值*/
+    /*tags的hashCode值*/
     private Set<Integer> codeSet = new HashSet<Integer>();
     private long subVersion = System.currentTimeMillis();
     private String expressionType = ExpressionType.TAG;

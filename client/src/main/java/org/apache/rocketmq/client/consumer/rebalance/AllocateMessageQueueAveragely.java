@@ -25,10 +25,18 @@ import org.apache.rocketmq.common.message.MessageQueue;
 
 /**
  * Average Hashing queue algorithm
+ * 平均分配策略，默认
  */
 public class AllocateMessageQueueAveragely implements AllocateMessageQueueStrategy {
     private final InternalLogger log = ClientLogger.getLog();
 
+    /*给消费者 进行分配 mq
+     * 参数1：消费者组
+     * 参数2：当前消费者id
+     * 参数3：主题全部队列集合（包括所有broker上 该主题的 mq）
+     * 参数4：全部消费者id集合
+     * 返回值：返回分配给消费者的队列集合
+     * */
     @Override
     public List<MessageQueue> allocate(String consumerGroup, String currentCID, List<MessageQueue> mqAll,
         List<String> cidAll) {

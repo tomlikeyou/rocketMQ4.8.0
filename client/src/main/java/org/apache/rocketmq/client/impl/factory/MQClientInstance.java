@@ -136,8 +136,9 @@ public class MQClientInstance {
     /*客户端协议处理器，用于处理  IO事件 */
     private final ClientRemotingProcessor clientRemotingProcessor;
 
-    /*拉消息服务、消费者负载均衡服务*/
+    /*拉消息服务*/
     private final PullMessageService pullMessageService;
+    /*消费者负载均衡服务*/
     private final RebalanceService rebalanceService;
 
     /*内部生产者实例，用于处理 消费端 消息回退*/
@@ -280,7 +281,6 @@ public class MQClientInstance {
     }
 
     public void start() throws MQClientException {
-
         synchronized (this) {
             switch (this.serviceState) {
                 case CREATE_JUST:
@@ -298,9 +298,10 @@ public class MQClientInstance {
                     /*启动定时任务入口*/
                     this.startScheduledTask();
 
-                    // Start pull service
+                    //启动拉消息服务
                     this.pullMessageService.start();
-                    // Start rebalance service
+
+                    //启动负载均衡服务
                     this.rebalanceService.start();
 
                     /*启动内部生产者对象，消息回退时会用到这个 生产者对象*/
@@ -780,12 +781,14 @@ public class MQClientInstance {
 
                             // Update sub info
                             {
+                                /*将主题路由信息转换为主题订阅信息，记录着该主题总共有哪些队列信息，每一个队列是属于哪个broker，队列ID是多少*/
                                 Set<MessageQueue> subscribeInfo = topicRouteData2TopicSubscribeInfo(topic, topicRouteData);
                                 Iterator<Entry<String, MQConsumerInner>> it = this.consumerTable.entrySet().iterator();
                                 while (it.hasNext()) {
                                     Entry<String, MQConsumerInner> entry = it.next();
                                     MQConsumerInner impl = entry.getValue();
                                     if (impl != null) {
+                                        /*调用消费者保存 该主题对应的队列信息，最终保存在消费者内部的 rbl对象当中*/
                                         impl.updateTopicSubscribeInfo(topic, subscribeInfo);
                                     }
                                 }
@@ -1096,6 +1099,7 @@ public class MQClientInstance {
     }
 
     public void doRebalance() {
+        /*遍历注册到客户端实例的每一个消费者，执行消费者的负载均衡逻辑*/
         for (Map.Entry<String, MQConsumerInner> entry : this.consumerTable.entrySet()) {
             MQConsumerInner impl = entry.getValue();
             if (impl != null) {

@@ -817,7 +817,7 @@ public class MQClientAPIImpl {
             * */
             @Override
             public void operationComplete(ResponseFuture responseFuture) {
-                /*获取服务器响应参数 respose*/
+                /*获取服务器响应参数 response*/
                 RemotingCommand response = responseFuture.getResponseCommand();
                 if (response != null) {
                     try {

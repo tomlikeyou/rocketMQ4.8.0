@@ -135,7 +135,7 @@ public class PullMessageProcessor extends AsyncNettyRequestProcessor implements 
 
         /*是否允许服务器端长轮询（true）*/
         final boolean hasSuspendFlag = PullSysFlag.hasSuspendFlag(requestHeader.getSysFlag());
-        /*客户端是否提交 offset（true）*/
+        /*客户端是否提交消费进度 offset（true）*/
         final boolean hasCommitOffsetFlag = PullSysFlag.hasCommitOffsetFlag(requestHeader.getSysFlag());
         /*客户端请求是否包含客户端的订阅信息数据（false）*/
         final boolean hasSubscriptionFlag = PullSysFlag.hasSubscriptionFlag(requestHeader.getSysFlag());
@@ -188,6 +188,7 @@ public class PullMessageProcessor extends AsyncNettyRequestProcessor implements 
                 return response;
             }
         } else {
+            /*查询 消费者组信息，根据请求带来的消费者组名*/
             ConsumerGroupInfo consumerGroupInfo =
                 this.brokerController.getConsumerManager().getConsumerGroupInfo(requestHeader.getConsumerGroup());
             if (null == consumerGroupInfo) {
@@ -203,7 +204,7 @@ public class PullMessageProcessor extends AsyncNettyRequestProcessor implements 
                 response.setRemark("the consumer group[" + requestHeader.getConsumerGroup() + "] can not consume by broadcast way");
                 return response;
             }
-
+            /*根据 消费者组信息 获取到主题的订阅信息*/
             subscriptionData = consumerGroupInfo.findSubscriptionData(requestHeader.getTopic());
             if (null == subscriptionData) {
                 log.warn("the consumer's subscription not exist, group: {}, topic:{}", requestHeader.getConsumerGroup(), requestHeader.getTopic());
@@ -252,7 +253,7 @@ public class PullMessageProcessor extends AsyncNettyRequestProcessor implements 
             messageFilter = new ExpressionForRetryMessageFilter(subscriptionData, consumerFilterData,
                 this.brokerController.getConsumerFilterManager());
         } else {
-            /**/
+            /*根据 主题的订阅信息 创建出 broker服务端的消息过滤器*/
             messageFilter = new ExpressionMessageFilter(subscriptionData, consumerFilterData,
                 this.brokerController.getConsumerFilterManager());
         }
@@ -272,15 +273,15 @@ public class PullMessageProcessor extends AsyncNettyRequestProcessor implements 
 
         if (getMessageResult != null) {
             response.setRemark(getMessageResult.getStatus().name());
-            /*设置 responseHeader.nextBeginOffset 为 服务器计算出来的 该队列 下一次pull时使用的offset*/
+            /*设置 responseHeader.nextBeginOffset 为 服务器计算出来的 该队列 下一次拉消息时使用的偏移量offset*/
             responseHeader.setNextBeginOffset(getMessageResult.getNextBeginOffset());
-            /*responseHeader.minOffset 为 pull queue的最小offset*/
+            /*responseHeader.minOffset 为 pull queue 拉的消息队列的最小偏移量offset*/
             responseHeader.setMinOffset(getMessageResult.getMinOffset());
-            /*responseHeader.maxOffset 为 pull queue的最大offset*/
+            /*responseHeader.maxOffset 为 pull queue 拉的消息队列的最大偏移量offset*/
             responseHeader.setMaxOffset(getMessageResult.getMaxOffset());
 
 
-            /*设置 客户端下次拉该queue时推荐使用的brokerId*/
+            /*设置 客户端下次拉该消息队列时推荐使用的brokerId*/
             if (getMessageResult.isSuggestPullingFromSlave()) {
                 responseHeader.setSuggestWhichBrokerId(subscriptionGroupConfig.getWhichBrokerWhenConsumeSlowly());
             } else {
@@ -409,6 +410,7 @@ public class PullMessageProcessor extends AsyncNettyRequestProcessor implements 
                 this.executeConsumeMessageHookBefore(context);
             }
 
+            /*检查response状态，走不同处理逻辑*/
             switch (response.getCode()) {
                 case ResponseCode.SUCCESS:/*查询成功*/
 
@@ -532,9 +534,9 @@ public class PullMessageProcessor extends AsyncNettyRequestProcessor implements 
         }
 
         /*1.brokerAllowSuspend ==true
-        * 2.sysFlag 表示 提交消费者本地该queue的offset
+        * 2.sysFlag 表示 提交消费者本地该queue消息队列的消费进度offset
         * 3.当前broker节点角色是 master节点
-        * 这三个条件全部成立时 才在broker端存储该消费者组内该queue的消费进度
+        * 这三个条件全部成立时 才在broker端存储该消费者组内该queue消息队列的消费进度
         * */
         boolean storeOffsetEnable = brokerAllowSuspend;
         storeOffsetEnable = storeOffsetEnable && hasCommitOffsetFlag;

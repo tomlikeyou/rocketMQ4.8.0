@@ -34,6 +34,7 @@ public class GetMessageResult {
 
     /*查询结果状态*/
     private GetMessageStatus status;
+
     /*客户端下次再向当前messageQueue 拉消息时，使用的offset*/
     private long nextBeginOffset;
     /*当前queue最小offset*/
@@ -43,7 +44,7 @@ public class GetMessageResult {
 
     /*消息总byte大小*/
     private int bufferTotalSize = 0;
-    /*服务器建议 客户端下次到该queue拉消息时，使用 主/从 节点*/
+    /*服务器建议 客户端下次到该queue消息队列拉消息时，使用 主/从 节点*/
     private boolean suggestPullingFromSlave = false;
 
     private int msgCount4Commercial = 0;

@@ -44,22 +44,32 @@ public class ProcessQueue {
     public final static long REBALANCE_LOCK_INTERVAL = Long.parseLong(System.getProperty("rocketmq.client.rebalance.lockInterval", "20000"));
     private final static long PULL_MAX_IDLE_TIME = Long.parseLong(System.getProperty("rocketmq.client.pull.pullMaxIdleTime", "120000"));
     private final InternalLogger log = ClientLogger.getLog();
+    /*读写锁*/
     private final ReadWriteLock lockTreeMap = new ReentrantReadWriteLock();
     private final TreeMap<Long, MessageExt> msgTreeMap = new TreeMap<Long, MessageExt>();
+    /*消息数量*/
     private final AtomicLong msgCount = new AtomicLong();
+    /*消息总大小*/
     private final AtomicLong msgSize = new AtomicLong();
+    /*重入锁，顺序消费使用*/
     private final Lock lockConsume = new ReentrantLock();
     /**
      * A subset of msgTreeMap, will only be used when orderly consume
+     * 消息容器，key：消息偏移量，value：消息
      */
     private final TreeMap<Long, MessageExt> consumingMsgOrderlyTreeMap = new TreeMap<Long, MessageExt>();
     private final AtomicLong tryUnlockTimes = new AtomicLong(0);
     private volatile long queueOffsetMax = 0L;
     private volatile boolean dropped = false;
+    /*上一次拉取消息时间*/
     private volatile long lastPullTimestamp = System.currentTimeMillis();
+    /*上次消费消息时间*/
     private volatile long lastConsumeTimestamp = System.currentTimeMillis();
+    /*锁定状态*/
     private volatile boolean locked = false;
+    /*上次获取锁时机*/
     private volatile long lastLockTimestamp = System.currentTimeMillis();
+    /*是否消费中*/
     private volatile boolean consuming = false;
     private volatile long msgAccCnt = 0;
 
@@ -114,9 +124,11 @@ public class ProcessQueue {
                 try {
                     this.lockTreeMap.writeLock().lockInterruptibly();
                     try {
-                        /*条件成立：消息回退期间，该目标“消息”并没有被 消费任务 成功消费
+                        /*
                         * 条件不成立：说明在消息回退期间，消费任务 将 目标“消息” 成功消费了，成功消费后，消费任务会执行 processConsumeResult
                         * 在这一步 会将 “msg”从treeMap中移除，就会导致 msg.getQueueOffset() == msgTreeMap.firstKey() == false
+                        *
+                        * 条件成立：消息回退期间，该目标“消息”并没有被 消费任务 成功消费
                         * */
                         if (!msgTreeMap.isEmpty() && msg.getQueueOffset() == msgTreeMap.firstKey()) {
                             try {
@@ -199,8 +211,10 @@ public class ProcessQueue {
     /**
      * 删除消息
      * @param msgs
-     * @return long 表示pq本地的消费进度
-     * （1、-1：说明pq 内 无数据  2、queueOffsetMax + 1（删完这批msgs之后 无消息了） 3、删完该批msgs之后 pq内 还有剩余待消费的消息，此时返回 firstMsg offset）
+     * @return long 表示processQueue本地的消费进度
+     * （1、-1：说明 processQueue 内 无数据
+     *  2、queueOffsetMax + 1（删完这批msgs之后 无消息了）
+     *  3、删完该批msgs之后 processQueue 内 还有剩余待消费的消息，此时返回 firstMsg offset）
      */
     public long removeMessage(final List<MessageExt> msgs) {
         long result = -1;

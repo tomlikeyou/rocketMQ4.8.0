@@ -158,7 +158,7 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
      * Message listener
      */
     /*消息监听器，消息处理逻辑全部由他提供（具体怎么消费.....）
-    * 两种接口：1. MessageListenerConcurrently  2. MessageListenerOrderly
+    * 两种接口：1. MessageListenerConcurrently（并发消费）  2. MessageListenerOrderly（局部有序消费）
     * */
     private MessageListener messageListener;
 
@@ -235,7 +235,7 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
     /**
      * Message pull Interval
      */
-    /*消费者两次拉取请求时间间隔*/
+    /*消费者两次拉取消息请求时间间隔*/
     private long pullInterval = 0;
 
     /**
@@ -268,7 +268,7 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
      * If messages are re-consumed more than {@link #maxReconsumeTimes} before success, it's be directed to a deletion
      * queue waiting.
      */
-    /*消息最大重试次数（默认 -1 ）*/
+    /*消息最大重试次数（默认 -1 ，意味着重试16次 ）*/
     private int maxReconsumeTimes = -1;
 
     /**

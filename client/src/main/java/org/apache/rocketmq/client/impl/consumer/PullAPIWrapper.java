@@ -56,7 +56,7 @@ public class PullAPIWrapper {
     /*消费者组*/
     private final String consumerGroup;
     private final boolean unitMode;
-    /*key：messageQueue，value：long（推荐消息使用的主机brokerId）*/
+    /*key：messageQueue消息队列，value：long（推荐拉取消息时 使用的主机brokerId）*/
     private ConcurrentMap<MessageQueue, AtomicLong/* brokerId */> pullFromWhichNodeTable =
         new ConcurrentHashMap<MessageQueue, AtomicLong>(32);
 
@@ -75,14 +75,14 @@ public class PullAPIWrapper {
     }
 
     /*
-    * 预处理 拉消息结果，主要将服务器指定该mq的拉消息下一次推荐的主机节点id 保存到 pullFromWhichNodeTable中
+    * 预处理 拉消息结果，主要将服务器指定该mq消息队列的拉消息下一次推荐的主机节点id 保存到 pullFromWhichNodeTable中
     * 以及消息客户端过滤
     * */
     public PullResult processPullResult(final MessageQueue mq, final PullResult pullResult,
         final SubscriptionData subscriptionData) {
         PullResultExt pullResultExt = (PullResultExt) pullResult;
 
-        /*更新 pullFromWhichNodeTable内 该mq的下次拉消息推荐主机broker Id*/
+        /*更新 pullFromWhichNodeTable内 该消息队列mq的下次拉消息推荐主机broker Id*/
         this.updatePullFromWhichNode(mq, pullResultExt.getSuggestWhichBrokerId());
 
         /*条件成立：说明从服务器端拉取到消息了*/
@@ -95,7 +95,7 @@ public class PullAPIWrapper {
             /*msgListFilterAgain：客户端过滤后的msgList*/
             List<MessageExt> msgListFilterAgain = msgList;
 
-            /*客户端按照tag 进行过滤*/
+            /*客户端 根据tag 进行过滤*/
             if (!subscriptionData.getTagsSet().isEmpty() && !subscriptionData.isClassFilterMode()) {
                 msgListFilterAgain = new ArrayList<MessageExt>(msgList.size());
                 for (MessageExt msg : msgList) {

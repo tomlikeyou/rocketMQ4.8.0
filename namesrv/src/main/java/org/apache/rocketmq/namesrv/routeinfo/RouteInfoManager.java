@@ -139,14 +139,14 @@ public class RouteInfoManager {
 
                 // true：代表broker是否是第一次向namesrv注册，反之不是
                 boolean registerFirst = false;
-                /*根据broker名称 从broker信息集合当中获取*/
+                /*根据broker名称 从broker地址信息集合当中获取*/
                 BrokerData brokerData = this.brokerAddrTable.get(brokerName);
                 /*条件成立：表明当前broker是第一次向namesrv发送心跳包 注册broker*/
                 if (null == brokerData) {
                     registerFirst = true;
                     // 创建一个broker信息对象 BrokerData
                     brokerData = new BrokerData(clusterName, brokerName, new HashMap<Long, String>());
-                    // 将broker信息 保存到broker信息映射表表当中，key：broker名称，value：broker信息 BrokerData
+                    // 将broker信息 保存到broker地址信息映射表表当中，key：broker名称，value：broker信息 BrokerData
                     this.brokerAddrTable.put(brokerName, brokerData);
                 }
                 /*获取brokerData的地址信息集合，一个broker可能会是主从模式*/

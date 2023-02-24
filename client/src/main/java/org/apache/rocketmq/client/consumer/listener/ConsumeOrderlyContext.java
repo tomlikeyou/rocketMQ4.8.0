@@ -22,6 +22,7 @@ import org.apache.rocketmq.common.message.MessageQueue;
  * Consumer Orderly consumption context
  */
 public class ConsumeOrderlyContext {
+    /*消息队列*/
     private final MessageQueue messageQueue;
     private boolean autoCommit = true;
     private long suspendCurrentQueueTimeMillis = -1;

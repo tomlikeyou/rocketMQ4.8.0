@@ -635,7 +635,7 @@ public class CommitLog {
         if (tranType == MessageSysFlag.TRANSACTION_NOT_TYPE
                 || tranType == MessageSysFlag.TRANSACTION_COMMIT_TYPE) {
 
-            /*这个代码块 说明消息设置了 延迟级别属性，这里会偷梁换柱，将消息的主题跟队列ID给换成 调度延迟主题（SCHEDULE_TOPIC_XXXX） 延迟级别-1*/
+            /*这个代码块 说明消息设置了 延迟级别属性，这里会偷梁换柱，将消息的主题跟队列ID给换成 延迟主题（SCHEDULE_TOPIC_XXXX） 延迟级别-1*/
             // Delay Delivery
             if (msg.getDelayTimeLevel() > 0) {
 
@@ -649,7 +649,7 @@ public class CommitLog {
                 /*延迟调度主题的 队列ID为 延迟级别 -1 */
                 queueId = ScheduleMessageService.delayLevel2QueueId(msg.getDelayTimeLevel());
 
-                /*将消息的 “topic” %RETRY%消费者组名 队列ID 0 记录到消息的属性中
+                /*将消息的 目标主题 %RETRY%消费者组名 队列ID 0 记录到消息的属性中
                 * key：“REAL_TOPIC” "REAL_QUEUE_ID"
                 * */
                 // Backup real topic, queueId

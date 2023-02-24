@@ -83,9 +83,9 @@ public class RebalancePushImpl extends RebalanceImpl {
 
     @Override
     public boolean removeUnnecessaryMessageQueue(MessageQueue mq, ProcessQueue pq) {
-        /*持久化 指定”mq“的消费进度，到mq归属的broker节点（broker端会根据group 维护 每个queue的offset）*/
+        /*持久化 指定消息队列的消费进度，到消息队列归属的broker节点（broker端会根据group 维护 每个消息队列的offset）*/
         this.defaultMQPushConsumerImpl.getOffsetStore().persist(mq);
-        /*从消费进度存储器中移除当前”mq“的offset（本地消费者）*/
+        /*从消费进度存储器中移除当前消息队列的offset（本地消费者）*/
         this.defaultMQPushConsumerImpl.getOffsetStore().removeOffset(mq);
 
         if (this.defaultMQPushConsumerImpl.isConsumeOrderly()
@@ -120,7 +120,7 @@ public class RebalancePushImpl extends RebalanceImpl {
 
         if (pq.hasTempMessage()) {
             log.info("[{}]unlockDelay, begin {} ", mq.hashCode(), mq);
-            /*当pq内的 treeMap有数据时，延迟20秒释放 队列分布式锁（这里延迟20秒是确保 全局范围内 只有一个消费任务 运行中）*/
+            /*当processQueue内的 treeMap有数据时，延迟20秒释放 队列分布式锁（这里延迟20秒是确保 全局范围内 只有一个消费任务 运行中）*/
             this.defaultMQPushConsumerImpl.getmQClientFactory().getScheduledExecutorService().schedule(new Runnable() {
                 @Override
                 public void run() {
@@ -129,7 +129,7 @@ public class RebalancePushImpl extends RebalanceImpl {
                 }
             }, UNLOCK_DELAY_TIME_MILLS, TimeUnit.MILLISECONDS);
         } else {
-            /*执行到这里，可以确定 当前消费者本地的 消费任务已经退出了！*/
+            /*执行到这里，可以确定 当前消费者本地的 该消费任务已经退出了！*/
             /*释放 队列分布式锁*/
             this.unlock(mq, true);
         }

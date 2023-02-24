@@ -65,7 +65,7 @@ public class ProcessQueue {
     private volatile long lastPullTimestamp = System.currentTimeMillis();
     /*上次消费消息时间*/
     private volatile long lastConsumeTimestamp = System.currentTimeMillis();
-    /*锁定状态*/
+    /*锁定状态，分布式锁*/
     private volatile boolean locked = false;
     /*上次获取锁时机*/
     private volatile long lastLockTimestamp = System.currentTimeMillis();
@@ -150,6 +150,11 @@ public class ProcessQueue {
         }
     }
 
+    /**
+     *
+     * @param msgs
+     * @return 返回值 对于并发消费来说无意义，对顺序消费有意义，返回true，顺序消费服务才会提交一个顺序消费任务，否则不会提交消费任务
+     */
     public boolean putMessage(final List<MessageExt> msgs) {
         boolean dispatchToConsume = false;
         try {
@@ -166,7 +171,11 @@ public class ProcessQueue {
                 }
                 msgCount.addAndGet(validMsgCnt);
 
+                /*!this.consuming 为true：说明消费者本地是没有一个顺序消费任务在消费消息的
+                * 为false：说明消费者本地有一个顺序消费任务正在执行
+                * */
                 if (!msgTreeMap.isEmpty() && !this.consuming) {
+                    /*修改状态为true，意味着接下来马上就有顺序消费任务消费了*/
                     dispatchToConsume = true;
                     this.consuming = true;
                 }
@@ -303,7 +312,7 @@ public class ProcessQueue {
                 /*将临时保存msgs的map清除*/
                 this.consumingMsgOrderlyTreeMap.clear();
                 if (offset != null) {
-                    /*消费者 下一条 要消费的消息 offset*/
+                    /*消费者 下一条 要消费的消息 物理偏移量*/
                     return offset + 1;
                 }
             } finally {
@@ -321,7 +330,9 @@ public class ProcessQueue {
             this.lockTreeMap.writeLock().lockInterruptibly();
             try {
                 for (MessageExt msg : msgs) {
+                    /*从临时的map中移除出去*/
                     this.consumingMsgOrderlyTreeMap.remove(msg.getQueueOffset());
+                    /*放入到消息快照内*/
                     this.msgTreeMap.put(msg.getQueueOffset(), msg);
                 }
             } finally {
@@ -351,6 +362,11 @@ public class ProcessQueue {
                     }
                 }
 
+                /*
+                * 条件成立：说明消息快照内没有消息了，是否消费中修改为false，
+                * 外层收到的集合会判断消息是否为空，为空，那么外层对应的消费任务就要结束了，
+                * 因为消息快照内没有消息了，怎么消费
+                * */
                 if (result.isEmpty()) {
                     consuming = false;
                 }

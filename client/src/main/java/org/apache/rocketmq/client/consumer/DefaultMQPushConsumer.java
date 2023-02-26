@@ -273,6 +273,7 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
 
     /**
      * Suspending pulling time for cases requiring slow pulling like flow-control scenario.
+     * 顺序消费 消费失败后会对消费失败的消息延迟一定时间然后重试，该值决定延迟多久
      */
     private long suspendCurrentQueueTimeMillis = 1000;
 

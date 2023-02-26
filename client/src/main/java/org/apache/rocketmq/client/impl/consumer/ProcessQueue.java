@@ -65,14 +65,19 @@ public class ProcessQueue {
     private volatile long lastPullTimestamp = System.currentTimeMillis();
     /*上次消费消息时间*/
     private volatile long lastConsumeTimestamp = System.currentTimeMillis();
-    /*锁定状态，分布式锁*/
+    /*锁定状态，该消息队列在broker端的分布式锁，顺序消费使用，分配给消费者新的消息队列时，需要从broker端获取该消息队列的分布式锁，才会进行后续拉消息、处理消息业务*/
     private volatile boolean locked = false;
     /*上次获取锁时机*/
     private volatile long lastLockTimestamp = System.currentTimeMillis();
-    /*是否消费中*/
+    /*是否消费中,顺序消费使用，判断消费者本地该消息队列是否有一个顺序消费任务*/
     private volatile boolean consuming = false;
     private volatile long msgAccCnt = 0;
 
+    /**
+     * 客户端判断消息队列的分布式锁是否过期，true：已过期，反之没有过期
+     * 过期时间阈值：30秒
+     * @return
+     */
     public boolean isLockExpired() {
         return (System.currentTimeMillis() - this.lastLockTimestamp) > REBALANCE_LOCK_MAX_LIVE_TIME;
     }
@@ -151,7 +156,7 @@ public class ProcessQueue {
     }
 
     /**
-     *
+     * 向消息快照内添加消息，并更新msgCount、msgSize
      * @param msgs
      * @return 返回值 对于并发消费来说无意义，对顺序消费有意义，返回true，顺序消费服务才会提交一个顺序消费任务，否则不会提交消费任务
      */
@@ -171,11 +176,11 @@ public class ProcessQueue {
                 }
                 msgCount.addAndGet(validMsgCnt);
 
-                /*!this.consuming 为true：说明消费者本地是没有一个顺序消费任务在消费消息的
-                * 为false：说明消费者本地有一个顺序消费任务正在执行
+                /*!this.consuming 为true：说明消费者本地该消息队列是没有一个顺序消费任务在消费消息的
+                * 为false：说明消费者本地该消息队列有一个顺序消费任务正在执行
                 * */
                 if (!msgTreeMap.isEmpty() && !this.consuming) {
-                    /*修改状态为true，意味着接下来马上就有顺序消费任务消费了*/
+                    /*修改状态为true，意味着接下来马上就有顺序消费任务消费消息了*/
                     dispatchToConsume = true;
                     this.consuming = true;
                 }
@@ -309,7 +314,7 @@ public class ProcessQueue {
                 for (MessageExt msg : this.consumingMsgOrderlyTreeMap.values()) {
                     msgSize.addAndGet(0 - msg.getBody().length);
                 }
-                /*将临时保存msgs的map清除*/
+                /*将临时保存消息的map数据清除*/
                 this.consumingMsgOrderlyTreeMap.clear();
                 if (offset != null) {
                     /*消费者 下一条 要消费的消息 物理偏移量*/
@@ -332,7 +337,7 @@ public class ProcessQueue {
                 for (MessageExt msg : msgs) {
                     /*从临时的map中移除出去*/
                     this.consumingMsgOrderlyTreeMap.remove(msg.getQueueOffset());
-                    /*放入到消息快照内*/
+                    /*再放入到消息快照内*/
                     this.msgTreeMap.put(msg.getQueueOffset(), msg);
                 }
             } finally {
@@ -343,6 +348,11 @@ public class ProcessQueue {
         }
     }
 
+    /**
+     * 从消息快照内获取batchSize个消息
+     * @param batchSize
+     * @return
+     */
     public List<MessageExt> takeMessages(final int batchSize) {
         List<MessageExt> result = new ArrayList<MessageExt>(batchSize);
         final long now = System.currentTimeMillis();
@@ -365,7 +375,7 @@ public class ProcessQueue {
                 /*
                 * 条件成立：说明消息快照内没有消息了，是否消费中修改为false，
                 * 外层收到的集合会判断消息是否为空，为空，那么外层对应的消费任务就要结束了，
-                * 因为消息快照内没有消息了，怎么消费
+                * 因为消息快照内没有消息了，怎么消费消息
                 * */
                 if (result.isEmpty()) {
                     consuming = false;

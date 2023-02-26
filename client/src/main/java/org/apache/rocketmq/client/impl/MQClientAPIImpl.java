@@ -1228,6 +1228,7 @@ public class MQClientAPIImpl {
         RemotingCommand request = RemotingCommand.createRequestCommand(RequestCode.LOCK_BATCH_MQ, null);
 
         request.setBody(requestBody.encode());
+        /*同步发送*/
         RemotingCommand response = this.remotingClient.invokeSync(MixAll.brokerVIPChannel(this.clientConfig.isVipChannelEnabled(), addr),
             request, timeoutMillis);
         switch (response.getCode()) {
@@ -1254,8 +1255,10 @@ public class MQClientAPIImpl {
         request.setBody(requestBody.encode());
 
         if (oneway) {
+            /*如果是单向发送消息，走这里*/
             this.remotingClient.invokeOneway(addr, request, timeoutMillis);
         } else {
+            /*否则默认同步发送消息*/
             RemotingCommand response = this.remotingClient
                 .invokeSync(MixAll.brokerVIPChannel(this.clientConfig.isVipChannelEnabled(), addr), request, timeoutMillis);
             switch (response.getCode()) {

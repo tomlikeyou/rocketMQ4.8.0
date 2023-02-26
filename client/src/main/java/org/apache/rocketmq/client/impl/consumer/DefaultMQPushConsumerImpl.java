@@ -311,7 +311,8 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                 return;
             }
         } else {
-            /*顺序消费*/
+            /*顺序消费逻辑*/
+            /*如果没获取到了该消息队列的分布式锁，则延迟3秒后再将拉请求任务提交到拉消息服务中*/
             if (processQueue.isLocked()) {
                 if (!pullRequest.isLockedFirst()) {
                     final long offset = this.rebalanceImpl.computePullFromWhere(pullRequest.getMessageQueue());
@@ -327,6 +328,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                     pullRequest.setNextOffset(offset);
                 }
             } else {
+                /*延迟3秒后再提交一个拉请求任务*/
                 this.executePullRequestLater(pullRequest, pullTimeDelayMillsWhenException);
                 log.info("pull message later because not locked in broker, {}", pullRequest);
                 return;
@@ -382,7 +384,11 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                                 DefaultMQPushConsumerImpl.this.getConsumerStatsManager().incPullTPS(pullRequest.getConsumerGroup(),
                                     pullRequest.getMessageQueue().getTopic(), pullResult.getMsgFoundList().size());
 
-                                /*将服务器拉取的消息list 加入到 消费者本地该mq对应的快照队列内*/
+                                /*将服务器拉取的消息list 加入到 消费者本地该消息队列对应的消息快照内
+                                * 返回布尔值，对于顺序消费有用，true：才会提交消费任务
+                                * 什么时候返回true？
+                                * 消息快照有数据，消费者本地没有该消息队列的顺序消费任务
+                                * */
                                 boolean dispatchToConsume = processQueue.putMessage(pullResult.getMsgFoundList());
 
                                 /*提交消费任务

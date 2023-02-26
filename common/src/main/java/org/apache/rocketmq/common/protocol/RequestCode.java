@@ -60,7 +60,7 @@ public class RequestCode {
     public static final int CHECK_TRANSACTION_STATE = 39;
 
     public static final int NOTIFY_CONSUMER_IDS_CHANGED = 40;
-
+    /*锁续约（或者叫加锁）请求码*/
     public static final int LOCK_BATCH_MQ = 41;
 
     public static final int UNLOCK_BATCH_MQ = 42;

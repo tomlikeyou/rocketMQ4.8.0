@@ -81,6 +81,13 @@ public class RebalancePushImpl extends RebalanceImpl {
         this.getmQClientFactory().sendHeartbeatToAllBrokerWithLock();
     }
 
+    /**
+     * 持久化消息队列的消费进度到broker上并从本地移除该消息队列的消费进度
+     * 如果是顺序消费，还会尝试获取顺序消费任务的锁，获取到后，将释放消息队列在broker上的分布式锁
+     * @param mq 消息队列
+     * @param pq 消息快照
+     * @return
+     */
     @Override
     public boolean removeUnnecessaryMessageQueue(MessageQueue mq, ProcessQueue pq) {
         /*持久化 指定消息队列的消费进度，到消息队列归属的broker节点（broker端会根据group 维护 每个消息队列的offset）*/
@@ -88,14 +95,16 @@ public class RebalancePushImpl extends RebalanceImpl {
         /*从消费进度存储器中移除当前消息队列的offset（本地消费者）*/
         this.defaultMQPushConsumerImpl.getOffsetStore().removeOffset(mq);
 
+        /*顺序消费的逻辑，释放该消息队列在broker上的分布式锁*/
         if (this.defaultMQPushConsumerImpl.isConsumeOrderly()
             && MessageModel.CLUSTERING.equals(this.defaultMQPushConsumerImpl.messageModel())) {
 
             /*集群模式下，顺序消费，会执行该逻辑*/
             try {
+                /*获取消费任务的锁，如果获取到锁，则说明消费者本地 该消息队列的顺序消费任务已经之行结束了*/
                 if (pq.getLockConsume().tryLock(1000, TimeUnit.MILLISECONDS)) {
                     try {
-                        /*释放锁（broker端的 队列锁）*/
+                        /*释放该消息队列在broker端的分布式锁*/
                         return this.unlockDelay(mq, pq);
                     } finally {
                         pq.getLockConsume().unlock();
@@ -120,7 +129,7 @@ public class RebalancePushImpl extends RebalanceImpl {
 
         if (pq.hasTempMessage()) {
             log.info("[{}]unlockDelay, begin {} ", mq.hashCode(), mq);
-            /*当processQueue内的 treeMap有数据时，延迟20秒释放 队列分布式锁（这里延迟20秒是确保 全局范围内 只有一个消费任务 运行中）*/
+            /*当消息快照内的 treeMap有数据时，延迟20秒释放 队列分布式锁（这里延迟20秒是确保 全局范围内 只有一个消费任务 运行中）*/
             this.defaultMQPushConsumerImpl.getmQClientFactory().getScheduledExecutorService().schedule(new Runnable() {
                 @Override
                 public void run() {

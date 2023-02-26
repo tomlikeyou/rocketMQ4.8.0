@@ -170,6 +170,7 @@ public class AdminBrokerProcessor extends AsyncNettyRequestProcessor implements 
                 return this.getEarliestMsgStoretime(ctx, request);
             case RequestCode.GET_BROKER_RUNTIME_INFO:
                 return this.getBrokerRuntimeInfo(ctx, request);
+            /*客户端获取消息队列分布式锁逻辑入口*/
             case RequestCode.LOCK_BATCH_MQ:
                 return this.lockBatchMQ(ctx, request);
             case RequestCode.UNLOCK_BATCH_MQ:
@@ -629,6 +630,7 @@ public class AdminBrokerProcessor extends AsyncNettyRequestProcessor implements 
 
     private RemotingCommand lockBatchMQ(ChannelHandlerContext ctx,
         RemotingCommand request) throws RemotingCommandException {
+        /*创建一个响应对象，没有请求头*/
         final RemotingCommand response = RemotingCommand.createResponseCommand(null);
         LockBatchRequestBody requestBody = LockBatchRequestBody.decode(request.getBody(), LockBatchRequestBody.class);
 

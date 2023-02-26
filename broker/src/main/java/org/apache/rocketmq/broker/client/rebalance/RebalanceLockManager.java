@@ -32,6 +32,7 @@ public class RebalanceLockManager {
     private final static long REBALANCE_LOCK_MAX_LIVE_TIME = Long.parseLong(System.getProperty(
         "rocketmq.broker.rebalance.lockMaxLiveTime", "60000"));
     private final Lock lock = new ReentrantLock();
+    /*消息队列分布式锁映射表，key：消费者组，value：key：消息队列，value：保存消费者客户端id跟最近一次加锁时间*/
     private final ConcurrentMap<String/* group */, ConcurrentHashMap<MessageQueue, LockEntry>> mqLockTable =
         new ConcurrentHashMap<String, ConcurrentHashMap<MessageQueue, LockEntry>>(1024);
 
@@ -114,12 +115,21 @@ public class RebalanceLockManager {
         return false;
     }
 
+    /**
+     * 消息队列集合进行 分布式锁续约
+     * @param group 消费者组
+     * @param mqs   需要锁续约的消息队列集合
+     * @param clientId 消费者客户端id
+     * @return
+     */
     public Set<MessageQueue> tryLockBatch(final String group, final Set<MessageQueue> mqs,
         final String clientId) {
         Set<MessageQueue> lockedMqs = new HashSet<MessageQueue>(mqs.size());
         Set<MessageQueue> notLockedMqs = new HashSet<MessageQueue>(mqs.size());
 
+        /*遍历每一个消息队列，判断消息队列*/
         for (MessageQueue mq : mqs) {
+            /*如果该消息队列被当前客户端id占用着，会更新该消息队列的锁时间为当前系统时间*/
             if (this.isLocked(group, mq, clientId)) {
                 lockedMqs.add(mq);
             } else {
@@ -232,7 +242,9 @@ public class RebalanceLockManager {
     }
 
     static class LockEntry {
+        /*消费者客户端id*/
         private String clientId;
+        /*最近一个加锁时间*/
         private volatile long lastUpdateTimestamp = System.currentTimeMillis();
 
         public String getClientId() {

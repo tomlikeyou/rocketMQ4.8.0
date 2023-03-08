@@ -21,6 +21,7 @@ import org.apache.rocketmq.common.MixAll;
 
 public class SubscriptionGroupConfig {
 
+    /*消费者组名*/
     private String groupName;
 
     private boolean consumeEnable = true;

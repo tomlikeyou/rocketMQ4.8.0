@@ -1644,6 +1644,7 @@ public class DefaultMessageStore implements MessageStore {
     }
 
     public void putMessagePositionInfo(DispatchRequest dispatchRequest) {
+        /*根据主题、队列ID找到对应的ConsumeQueue对象*/
         ConsumeQueue cq = this.findConsumeQueue(dispatchRequest.getTopic(), dispatchRequest.getQueueId());
         cq.putMessagePositionInfoWrapper(dispatchRequest);
     }
@@ -2078,13 +2079,19 @@ public class DefaultMessageStore implements MessageStore {
                     try {
                         this.reputFromOffset = result.getStartOffset();
 
+                        /*循环处理每一条消息*/
                         for (int readSize = 0; readSize < result.getSize() && doNext; ) {
+                            /*
+                            * DispatchRequest 跟Message差不多，只是没有body属性，
+                            * 这一步会检查消息是否设置了延迟级别，设置了会修改消息的tagCode值为 到期交付时间
+                            * */
                             DispatchRequest dispatchRequest =
                                 DefaultMessageStore.this.commitLog.checkMessageAndReturnSize(result.getByteBuffer(), false, false);
                             int size = dispatchRequest.getBufferSize() == -1 ? dispatchRequest.getMsgSize() : dispatchRequest.getBufferSize();
 
                             if (dispatchRequest.isSuccess()) {
                                 if (size > 0) {
+                                    /*将消息同步到消费队列、索引文件中*/
                                     DefaultMessageStore.this.doDispatch(dispatchRequest);
 
                                     if (BrokerRole.SLAVE != DefaultMessageStore.this.getMessageStoreConfig().getBrokerRole()

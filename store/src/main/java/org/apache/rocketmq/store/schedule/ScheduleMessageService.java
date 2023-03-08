@@ -52,7 +52,7 @@ public class ScheduleMessageService extends ConfigManager {
     private static final long DELAY_FOR_A_WHILE = 100L;
     private static final long DELAY_FOR_A_PERIOD = 10000L;
 
-    /*存储延迟级别 对应的 延迟时间长度（单位：毫秒）*/
+    /*存储延迟级别 对应的 延迟时间长度（单位：毫秒），key：延迟级别，value：对应的延迟时长（单位：毫秒）*/
     private final ConcurrentMap<Integer /* level */, Long/* delay timeMillis */> delayLevelTable =
         new ConcurrentHashMap<Integer, Long>(32);
 
@@ -110,6 +110,12 @@ public class ScheduleMessageService extends ConfigManager {
         this.offsetTable.put(delayLevel, offset);
     }
 
+    /**
+     * 根据延迟级别计算 消息的到期时间
+     * @param delayLevel
+     * @param storeTimestamp
+     * @return 消息的延迟到期时间
+     */
     public long computeDeliverTimestamp(final int delayLevel, final long storeTimestamp) {
         Long time = this.delayLevelTable.get(delayLevel);
         if (time != null) {
@@ -311,8 +317,8 @@ public class ScheduleMessageService extends ConfigManager {
                         long nextOffset = offset;
                         int i = 0;
                         ConsumeQueueExt.CqExtUnit cqExtUnit = new ConsumeQueueExt.CqExtUnit();
+                        /*依次读取20个字节*/
                         for (; i < bufferCQ.getSize(); i += ConsumeQueue.CQ_STORE_UNIT_SIZE) {
-                            /*读取20个字节*/
                             /*延迟消息的物理偏移量*/
                             long offsetPy = bufferCQ.getByteBuffer().getLong();
                             /*延迟消息的消息大小*/
@@ -346,7 +352,7 @@ public class ScheduleMessageService extends ConfigManager {
 
                             /*条件成立：说明 msg已经到达交付时间了*/
                             if (countdown <= 0) {
-                                /*根据 offsetPy（消息在commitLog的物理偏移量） 和 sizePy（消息size大小） 从 commitLog文件中 读取出 延迟主题的延迟队列的这条消息*/
+                                /*根据 offsetPy（消息在commitLog的物理偏移量） 和 sizePy（消息size大小） 从 commitLog文件中 读取出 该延迟消息*/
                                 MessageExt msgExt =
                                     ScheduleMessageService.this.defaultMessageStore.lookMessageByOffset(
                                         offsetPy, sizePy);
@@ -454,7 +460,7 @@ public class ScheduleMessageService extends ConfigManager {
             msgInner.setReconsumeTimes(msgExt.getReconsumeTimes());
 
             msgInner.setWaitStoreMsgOK(false);
-            /*清理新消息的延迟级别属性，为什么要清理呢？ 不清理的话 该消息回头存储时发现延迟级别大于0 又被转发到 延迟主题（SCHEDULE_TOPIC_XXXX主题）了*/
+            /*清理新消息的延迟级别属性，为什么要清理呢？ 不清理的话 该消息回头在CommitLog存储时发现延迟级别大于0 又被转发到 延迟主题下（SCHEDULE_TOPIC_XXXX）了*/
             MessageAccessor.clearProperty(msgInner, MessageConst.PROPERTY_DELAY_TIME_LEVEL);
 
             /*修改主题为重试主题 %RETRY%消费者组名 */

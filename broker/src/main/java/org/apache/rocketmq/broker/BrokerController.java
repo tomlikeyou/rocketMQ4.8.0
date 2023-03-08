@@ -162,7 +162,9 @@ public class BrokerController {
     private BrokerFastFailure brokerFastFailure;
     private Configuration configuration;
     private FileWatchService fileWatchService;
+    /*事务消息回查服务*/
     private TransactionalMessageCheckService transactionalMessageCheckService;
+    /*事务消息服务，主要作用就是替换消息的主题、队列ID为半事务主题、并保存原有主题、队列ID信息*/
     private TransactionalMessageService transactionalMessageService;
     private AbstractTransactionalMessageCheckListener transactionalMessageCheckListener;
     private Future<?> slaveSyncFuture;
@@ -240,7 +242,7 @@ public class BrokerController {
 
         if (result) {
             try {
-                /*创建一个messageStore对象*/
+                /*实例化存储主模块对象*/
                 this.messageStore =
                     new DefaultMessageStore(this.messageStoreConfig, this.brokerStatsManager, this.messageArrivingListener,
                         this.brokerConfig);
@@ -481,6 +483,7 @@ public class BrokerController {
                     log.warn("FileWatchService created error, can't load the certificate dynamically");
                 }
             }
+            /*初始化事务相关业务*/
             initialTransaction();
             initialAcl();
             initialRpcHooks();
@@ -491,6 +494,7 @@ public class BrokerController {
     private void initialTransaction() {
         this.transactionalMessageService = ServiceProvider.loadClass(ServiceProvider.TRANSACTION_SERVICE_ID, TransactionalMessageService.class);
         if (null == this.transactionalMessageService) {
+            /*初始化事务消息服务*/
             this.transactionalMessageService = new TransactionalMessageServiceImpl(new TransactionalMessageBridge(this, this.getMessageStore()));
             log.warn("Load default transaction message hook service: {}", TransactionalMessageServiceImpl.class.getSimpleName());
         }
@@ -500,6 +504,7 @@ public class BrokerController {
             log.warn("Load default discard message hook service: {}", DefaultTransactionalMessageCheckListener.class.getSimpleName());
         }
         this.transactionalMessageCheckListener.setBrokerController(this);
+        /*初始化事务消息回查服务*/
         this.transactionalMessageCheckService = new TransactionalMessageCheckService(this);
     }
 

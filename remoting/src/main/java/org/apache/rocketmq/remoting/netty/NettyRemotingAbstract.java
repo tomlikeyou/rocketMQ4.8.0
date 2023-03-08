@@ -478,10 +478,11 @@ public abstract class NettyRemotingAbstract {
                     throw new RemotingTimeoutException(RemotingHelper.parseSocketAddressAddr(addr), timeoutMillis,
                         responseFuture.getCause());
                 } else {
+                    /*否则就是请求写失败异常*/
                     throw new RemotingSendRequestException(RemotingHelper.parseSocketAddressAddr(addr), responseFuture.getCause());
                 }
             }
-            // 返回客户端的 请求 结果
+            // 正常会返回客户端的 请求 结果
             return responseCommand;
         } finally {
             // 移除 映射表 入口1

@@ -55,6 +55,7 @@ public class ClientManageProcessor extends AsyncNettyRequestProcessor implements
     public RemotingCommand processRequest(ChannelHandlerContext ctx, RemotingCommand request)
         throws RemotingCommandException {
         switch (request.getCode()) {
+            /*处理心跳信息请求*/
             case RequestCode.HEART_BEAT:
                 return this.heartBeat(ctx, request);
             case RequestCode.UNREGISTER_CLIENT:

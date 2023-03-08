@@ -26,7 +26,7 @@ public interface TransactionalMessageService {
 
     /**
      * Process prepare message, in common, we should put this message to storage service.
-     *
+     *  处理事务消息，主要是更改主题、队列ID，并保存原有主题、队列ID
      * @param messageInner Prepare(Half) message.
      * @return Prepare message storage result.
      */
@@ -64,6 +64,7 @@ public interface TransactionalMessageService {
     OperationResult rollbackMessage(EndTransactionRequestHeader requestHeader);
 
     /**
+     * 事务消息回查
      * Traverse uncommitted/unroll back half message and send check back request to producer to obtain transaction
      * status.
      *

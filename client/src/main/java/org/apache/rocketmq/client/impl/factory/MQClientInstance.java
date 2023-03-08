@@ -112,6 +112,7 @@ public class MQClientInstance {
     private final ConcurrentMap<String/* Topic */, TopicRouteData> topicRouteTable = new ConcurrentHashMap<String, TopicRouteData>();
 
     private final Lock lockNamesrv = new ReentrantLock();
+    /*心跳锁*/
     private final Lock lockHeartbeat = new ReentrantLock();
     /*broker 物理节点映射表；
     * key：broker名称，
@@ -554,6 +555,9 @@ public class MQClientInstance {
         }
     }
 
+    /**
+     * 向所有在线的broker节点发送心跳信息
+     */
     public void sendHeartbeatToAllBrokerWithLock() {
         if (this.lockHeartbeat.tryLock()) {
             try {
@@ -630,7 +634,9 @@ public class MQClientInstance {
 
     private void sendHeartbeatToAllBroker() {
         final HeartbeatData heartbeatData = this.prepareHeartbeatData();
+        /*判断心跳信息是否包含生产者数据*/
         final boolean producerEmpty = heartbeatData.getProducerDataSet().isEmpty();
+        /*判断心跳信息是否包含消费者数据*/
         final boolean consumerEmpty = heartbeatData.getConsumerDataSet().isEmpty();
         if (producerEmpty && consumerEmpty) {
             log.warn("sending heartbeat, but no consumer and no producer. [{}]", this.clientId);
@@ -638,15 +644,20 @@ public class MQClientInstance {
         }
 
         if (!this.brokerAddrTable.isEmpty()) {
+            /*心跳次数统计*/
             long times = this.sendHeartbeatTimesTotal.getAndIncrement();
+            /*向所有的broker节点发送心跳信息*/
             Iterator<Entry<String, HashMap<Long, String>>> it = this.brokerAddrTable.entrySet().iterator();
             while (it.hasNext()) {
                 Entry<String, HashMap<Long, String>> entry = it.next();
+                /*broker名称*/
                 String brokerName = entry.getKey();
                 HashMap<Long, String> oneTable = entry.getValue();
                 if (oneTable != null) {
                     for (Map.Entry<Long, String> entry1 : oneTable.entrySet()) {
+                        /*broker id*/
                         Long id = entry1.getKey();
+                        /*broker ip地址*/
                         String addr = entry1.getValue();
                         if (addr != null) {
                             if (consumerEmpty) {
@@ -823,32 +834,38 @@ public class MQClientInstance {
     private HeartbeatData prepareHeartbeatData() {
         HeartbeatData heartbeatData = new HeartbeatData();
 
-        // clientID
+        //客户端id
         heartbeatData.setClientID(this.clientId);
 
-        // Consumer
+        /*遍历每个注册到客户端实例的消费者，*/
         for (Map.Entry<String, MQConsumerInner> entry : this.consumerTable.entrySet()) {
             MQConsumerInner impl = entry.getValue();
             if (impl != null) {
                 ConsumerData consumerData = new ConsumerData();
+                /*设置消费者组名*/
                 consumerData.setGroupName(impl.groupName());
+                /*设置消费模式*/
                 consumerData.setConsumeType(impl.consumeType());
                 consumerData.setMessageModel(impl.messageModel());
+                /*设置从哪里开始消费*/
                 consumerData.setConsumeFromWhere(impl.consumeFromWhere());
+                /*设置主题订阅信息*/
                 consumerData.getSubscriptionDataSet().addAll(impl.subscriptions());
                 consumerData.setUnitMode(impl.isUnitMode());
 
+                /*添加到心跳信息的消费者集合当中*/
                 heartbeatData.getConsumerDataSet().add(consumerData);
             }
         }
 
-        // Producer
+        // 遍历注册到客户端实例的每个生产者
         for (Map.Entry<String/* group */, MQProducerInner> entry : this.producerTable.entrySet()) {
             MQProducerInner impl = entry.getValue();
             if (impl != null) {
                 ProducerData producerData = new ProducerData();
+                /*设置生产者组名*/
                 producerData.setGroupName(entry.getKey());
-
+                /*添加到生产者集合当中*/
                 heartbeatData.getProducerDataSet().add(producerData);
             }
         }

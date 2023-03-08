@@ -107,14 +107,16 @@ public class DefaultMQProducerImpl implements MQProducerInner {
     private final ArrayList<SendMessageHook> sendMessageHookList = new ArrayList<SendMessageHook>();
     /*rpcHook 最终会传递给NettyRemotingClient，留给用户拓展框架使用的*/
     private final RPCHook rpcHook;
-    /*异步发送消息，异步任务线程池使用的队列*/
+    /*异步发送消息线程池使用的阻塞队列*/
     private final BlockingQueue<Runnable> asyncSenderThreadPoolQueue;
-    /*缺省的异步发送消息线程池*/
+    /*缺省的异步消息发送线程池*/
     private final ExecutorService defaultAsyncSenderExecutor;
     /*定时任务 执行  RequestFutureTable.scanExpiredRequest();*/
     private final Timer timer = new Timer("RequestHouseKeepingService", true);
 
+    /*事务消息回查线程池阻塞队列*/
     protected BlockingQueue<Runnable> checkRequestQueue;
+    /*事务消息回查线程池*/
     protected ExecutorService checkExecutor;
     /*状态*/
     private ServiceState serviceState = ServiceState.CREATE_JUST;
@@ -206,7 +208,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                     /*修改生产者实例名称为 当前进程的PID*/
                     this.defaultMQProducer.changeInstanceNameToPID();
                 }
-                /*获取或创建一个MQClientInstance*/
+                /*获取或创建一个客户端实例对象*/
                 this.mQClientFactory = MQClientManager.getInstance().getOrCreateMQClientInstance(this.defaultMQProducer, rpcHook);
                 /*将生产者自己注册到 RocketMQ客户端实例当中（观察者模式）*/
                 boolean registerOK = mQClientFactory.registerProducer(this.defaultMQProducer.getProducerGroup(), this);
@@ -221,7 +223,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                 this.topicPublishInfoTable.put(this.defaultMQProducer.getCreateTopicKey(), new TopicPublishInfo());
 
                 if (startFactory) {
-                    /*启动 RocketMQ 客户端实例对象，入口*/
+                    /*启动 RocketMQ 客户端实例对象*/
                     mQClientFactory.start();
                 }
 
@@ -240,7 +242,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
             default:
                 break;
         }
-        /*强制RocketMQ 客户端实例 向已知的broke节点 发送一次心跳（讲客户端定时任务时候再聊）*/
+        /*强制RocketMQ 客户端实例 向已知的broker节点 发送一次心跳（讲客户端定时任务时候再聊）*/
         this.mQClientFactory.sendHeartbeatToAllBrokerWithLock();
         /*request 发送的消息 需要消费者 回执一条消息
         * 怎么实现的呢？
@@ -1404,12 +1406,14 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                     }
                     String transactionId = msg.getProperty(MessageConst.PROPERTY_UNIQ_CLIENT_MESSAGE_ID_KEYIDX);
                     if (null != transactionId && !"".equals(transactionId)) {
+                        /*设置消息 事务id值为 消息id*/
                         msg.setTransactionId(transactionId);
                     }
                     if (null != localTransactionExecuter) {
                         localTransactionState = localTransactionExecuter.executeLocalTransactionBranch(msg, arg);
                     } else if (transactionListener != null) {
                         log.debug("Used new transaction API");
+                        /*执行本地事务，返回事务结果*/
                         localTransactionState = transactionListener.executeLocalTransaction(msg, arg);
                     }
                     if (null == localTransactionState) {
@@ -1437,6 +1441,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         }
 
         try {
+            /*进行二阶段提交确认（是commit还是callback）*/
             this.endTransaction(sendResult, localTransactionState, localException);
         } catch (Exception e) {
             log.warn("local transaction execute " + localTransactionState + ", but end broker transaction failed", e);

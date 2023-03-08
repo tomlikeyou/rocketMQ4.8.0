@@ -393,15 +393,19 @@ public class CommitLog {
 
                 // Timing message processing
                 {
+                    /*获取消息的延迟级别属性*/
                     String t = propertiesMap.get(MessageConst.PROPERTY_DELAY_TIME_LEVEL);
+                    /*条件成立：说明发现该消息是一条延迟消息，这里会将消息的tagCode值修改为 消息到期时间*/
                     if (TopicValidator.RMQ_SYS_SCHEDULE_TOPIC.equals(topic) && t != null) {
                         int delayLevel = Integer.parseInt(t);
 
+                        /*如果延迟级别超过了最大的延迟级别，重置为最大的延迟级别*/
                         if (delayLevel > this.defaultMessageStore.getScheduleMessageService().getMaxDelayLevel()) {
                             delayLevel = this.defaultMessageStore.getScheduleMessageService().getMaxDelayLevel();
                         }
 
                         if (delayLevel > 0) {
+                            /*将消息的tagCode值修改为 消息到期时间*/
                             tagsCode = this.defaultMessageStore.getScheduleMessageService().computeDeliverTimestamp(delayLevel,
                                 storeTimestamp);
                         }
@@ -644,9 +648,9 @@ public class CommitLog {
                     msg.setDelayTimeLevel(this.defaultMessageStore.getScheduleMessageService().getMaxDelayLevel());
                 }
 
-                /* SCHEDULE_TOPIC_XXXX */
+                /*延迟主题：SCHEDULE_TOPIC_XXXX */
                 topic = TopicValidator.RMQ_SYS_SCHEDULE_TOPIC;
-                /*延迟调度主题的 队列ID为 延迟级别 -1 */
+                /*延迟主题的 队列ID为 延迟级别 -1 */
                 queueId = ScheduleMessageService.delayLevel2QueueId(msg.getDelayTimeLevel());
 
                 /*将消息的 目标主题 %RETRY%消费者组名 队列ID 0 记录到消息的属性中
@@ -657,9 +661,9 @@ public class CommitLog {
                 MessageAccessor.putProperty(msg, MessageConst.PROPERTY_REAL_QUEUE_ID, String.valueOf(msg.getQueueId()));
                 msg.setPropertiesString(MessageDecoder.messageProperties2String(msg.getProperties()));
 
-                /*修改 主题为 SCHEDULE_TOPIC_XXXX*/
+                /*修改主题为 延迟主题*/
                 msg.setTopic(topic);
-                /*队列为 延迟级别 -1 */
+                /*修改队列ID为 延迟级别 -1 */
                 msg.setQueueId(queueId);
             }
         }
@@ -1004,7 +1008,7 @@ public class CommitLog {
     }
 
     public CompletableFuture<PutMessageStatus> submitFlushRequest(AppendMessageResult result, MessageExt messageExt) {
-        // Synchronization flush
+        /*同步刷盘*/
         if (FlushDiskType.SYNC_FLUSH == this.defaultMessageStore.getMessageStoreConfig().getFlushDiskType()) {
             final GroupCommitService service = (GroupCommitService) this.flushCommitLogService;
             if (messageExt.isWaitStoreMsgOK()) {
@@ -1017,7 +1021,7 @@ public class CommitLog {
                 return CompletableFuture.completedFuture(PutMessageStatus.PUT_OK);
             }
         }
-        // Asynchronous flush
+        /*异步刷盘*/
         else {
             if (!this.defaultMessageStore.getMessageStoreConfig().isTransientStorePoolEnable()) {
                 flushCommitLogService.wakeup();
@@ -1397,6 +1401,7 @@ public class CommitLog {
     }
 
     class FlushRealTimeService extends FlushCommitLogService {
+        /*上次刷盘时间戳*/
         private long lastFlushTimestamp = 0;
         private long printTimes = 0;
 
@@ -1490,7 +1495,7 @@ public class CommitLog {
     }
 
     public static class GroupCommitRequest {
-        /*本条消息存储之后，下一条消息开始的offset*/
+        /*本条消息存储之后，下一条消息存储开始的offset*/
         private final long nextOffset;
         /*future对象*/
         private CompletableFuture<PutMessageStatus> flushOKFuture = new CompletableFuture<>();

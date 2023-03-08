@@ -94,8 +94,10 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
                                                                   RemotingCommand request) throws RemotingCommandException {
         final SendMessageContext mqtraceContext;
         switch (request.getCode()) {
+            /*消息回退处理逻辑*/
             case RequestCode.CONSUMER_SEND_MSG_BACK:
                 return this.asyncConsumerSendMsgBack(ctx, request);
+            /*普通消息处理逻辑*/
             default:
                 SendMessageRequestHeader requestHeader = parseRequestHeader(request);
                 if (requestHeader == null) {
@@ -104,8 +106,10 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
                 mqtraceContext = buildMsgContext(ctx, requestHeader);
                 this.executeSendMessageHookBefore(ctx, request, mqtraceContext);
                 if (requestHeader.isBatch()) {
+                    /*批量发送消息处理走这里*/
                     return this.asyncSendBatchMessage(ctx, request, mqtraceContext, requestHeader);
                 } else {
+                    /*普通消息发送走这里*/
                     return this.asyncSendMessage(ctx, request, mqtraceContext, requestHeader);
                 }
         }
@@ -360,7 +364,9 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
         CompletableFuture<PutMessageResult> putMessageResult = null;
         Map<String, String> origProps = MessageDecoder.string2messageProperties(requestHeader.getProperties());
         String transFlag = origProps.get(MessageConst.PROPERTY_TRANSACTION_PREPARED);
+        /*条件成立：说明是一条事务消息*/
         if (transFlag != null && Boolean.parseBoolean(transFlag)) {
+            /*条件成立：该broker拒绝处理事务消息*/
             if (this.brokerController.getBrokerConfig().isRejectTransactionMessage()) {
                 response.setCode(ResponseCode.NO_PERMISSION);
                 response.setRemark(
@@ -368,8 +374,10 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
                                 + "] sending transaction message is forbidden");
                 return CompletableFuture.completedFuture(response);
             }
+            /*将事务消息交给事务消息服务处理*/
             putMessageResult = this.brokerController.getTransactionalMessageService().asyncPrepareMessage(msgInner);
         } else {
+            /*普通消息走这里*/
             putMessageResult = this.brokerController.getMessageStore().asyncPutMessage(msgInner);
         }
         return handlePutMessageResultFuture(putMessageResult, response, request, msgInner, responseHeader, mqtraceContext, ctx, queueIdInt);

@@ -171,9 +171,12 @@ public class RemotingUtil {
             sc.configureBlocking(true);
             sc.socket().setSoLinger(false, -1);
             sc.socket().setTcpNoDelay(true);
+            /*收发缓冲区大小：64k*/
             sc.socket().setReceiveBufferSize(1024 * 64);
             sc.socket().setSendBufferSize(1024 * 64);
+            /*发起连接*/
             sc.socket().connect(remote, timeoutMillis);
+            /*设置非阻塞*/
             sc.configureBlocking(false);
             return sc;
         } catch (Exception e) {

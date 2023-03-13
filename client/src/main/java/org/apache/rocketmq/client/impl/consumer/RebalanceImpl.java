@@ -229,7 +229,7 @@ public abstract class RebalanceImpl {
 
                     /*遍历每一个续约锁成功的消息队列*/
                     for (MessageQueue mq : lockOKMQSet) {
-                        /*获取对应的processQueue*/
+                        /*获取对应的消息快照*/
                         ProcessQueue processQueue = this.processQueueTable.get(mq);
                         if (processQueue != null) {
                             if (!processQueue.isLocked()) {

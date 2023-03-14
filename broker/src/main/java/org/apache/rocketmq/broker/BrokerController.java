@@ -422,8 +422,11 @@ public class BrokerController {
             }
 
             if (!messageStoreConfig.isEnableDLegerCommitLog()) {
+                /*Broker启动阶段，如果该Broker是slave节点的话*/
                 if (BrokerRole.SLAVE == this.messageStoreConfig.getBrokerRole()) {
+                    /*从配置中读取 master节点的ha监听地址 ip:port*/
                     if (this.messageStoreConfig.getHaMasterAddress() != null && this.messageStoreConfig.getHaMasterAddress().length() >= 6) {
+                        /*存储主模块保存 master的ha监听地址，最终保存在HAClient的 masterAddress 属性里*/
                         this.messageStore.updateHaMasterAddress(this.messageStoreConfig.getHaMasterAddress());
                         this.updateMasterHAServerAddrPeriodically = false;
                     } else {

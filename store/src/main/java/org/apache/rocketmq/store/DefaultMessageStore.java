@@ -84,6 +84,7 @@ public class DefaultMessageStore implements MessageStore {
     /*消息分发服务，新消息保存到CommitLog文件之后，需要同步添加到消费队列文件跟索引文件，它就做个事情*/
     private final ReputMessageService reputMessageService;
 
+    /*ha 主从同步服务*/
     private final HAService haService;
     /*调度消息服务*/
     private final ScheduleMessageService scheduleMessageService;
@@ -290,7 +291,9 @@ public class DefaultMessageStore implements MessageStore {
         }
 
         if (!messageStoreConfig.isEnableDLegerCommitLog()) {
+            /*启动ha服务*/
             this.haService.start();
+            /*启动调度消息服务*/
             this.handleScheduleMessageService(messageStoreConfig.getBrokerRole());
         }
 
@@ -1119,6 +1122,7 @@ public class DefaultMessageStore implements MessageStore {
 
     @Override
     public void updateHaMasterAddress(String newAddr) {
+        /*调用ha服务保存master的ha监听地址*/
         this.haService.updateMasterAddress(newAddr);
     }
 

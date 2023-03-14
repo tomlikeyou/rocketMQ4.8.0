@@ -115,12 +115,14 @@ public class MessageStoreConfig {
     @ImportantField
     private boolean messageIndexSafe = false;
     private int haListenPort = 10912;
+    /*HA发送心跳包时间间隔*/
     private int haSendHeartbeatInterval = 1000 * 5;
     private int haHousekeepingInterval = 1000 * 20;
     private int haTransferBatchSize = 1024 * 32;
     @ImportantField
     private String haMasterAddress = null;
     private int haSlaveFallbehindMax = 1024 * 1024 * 256;
+    /*决定Broker节点是什么角色*/
     @ImportantField
     private BrokerRole brokerRole = BrokerRole.ASYNC_MASTER;
     /*默认异步刷盘*/

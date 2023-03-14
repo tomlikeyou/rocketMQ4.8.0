@@ -101,7 +101,7 @@ public class RebalancePushImpl extends RebalanceImpl {
 
             /*集群模式下，顺序消费，会执行该逻辑*/
             try {
-                /*获取消费任务的锁，如果获取到锁，则说明消费者本地 该消息队列的顺序消费任务已经之行结束了*/
+                /*获取消费任务的锁，如果获取到锁，则说明消费者本地 该消息队列的顺序消费任务已经执行结束了*/
                 if (pq.getLockConsume().tryLock(1000, TimeUnit.MILLISECONDS)) {
                     try {
                         /*释放该消息队列在broker端的分布式锁*/

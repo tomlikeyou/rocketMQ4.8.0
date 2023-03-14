@@ -60,7 +60,7 @@ public class HAService {
     private final DefaultMessageStore defaultMessageStore;
 
     private final WaitNotifyObject waitNotifyObject = new WaitNotifyObject();
-    /*maste向 slave节点推送的 最大offset（表示数据同步进度吧）*/
+    /*master向 slave节点推送的 最大offset（表示数据同步进度吧）*/
     private final AtomicLong push2SlaveMaxOffset = new AtomicLong(0);
 
     /*前面讲的 GroupCommitService 没太大区别 主要也是控制：生产者线程 阻塞等待的逻辑*/
@@ -422,7 +422,7 @@ public class HAService {
         /**
          * 上报slave同步进度
          * @param maxOffset
-         * @return
+         * @return 返回false，表示在进行网络读写时发生了IO异常，此时会关闭与Master的连接
          */
         private boolean reportSlaveMaxOffset(final long maxOffset) {
             this.reportOffset.position(0);
@@ -445,7 +445,7 @@ public class HAService {
             }
 
             lastWriteTimestamp = HAService.this.defaultMessageStore.getSystemClock().now();
-            /*写成功之后，pos ==limit 返回true*/
+            /*写成功之后，返回true*/
             return !this.reportOffset.hasRemaining();
         }
 
@@ -537,7 +537,7 @@ public class HAService {
                     long masterPhyOffset = this.byteBufferRead.getLong(this.dispatchPosition);
                     int bodySize = this.byteBufferRead.getInt(this.dispatchPosition + 8);
 
-                    /*slave端最大物理偏移量*/
+                    /*slave端最大消息物理偏移量*/
                     long slavePhyOffset = HAService.this.defaultMessageStore.getMaxPhyOffset();
 
                     if (slavePhyOffset != 0) {
@@ -567,12 +567,12 @@ public class HAService {
                         * */
                         HAService.this.defaultMessageStore.appendToCommitLog(masterPhyOffset, bodyData);
 
-                        /*恢复 byteBufferRead 的pos指针*/
+                        /*恢复 byteBufferRead 的pos指针，这里缓冲区获取数据的推进是通过 dispatchPosition来维护的*/
                         this.byteBufferRead.position(readSocketPos);
                         /*加一帧数据长度，方便处理下一条数据时使用*/
                         this.dispatchPosition += msgHeaderSize + bodySize;
 
-                        /*上报slave的同步进度信息*/
+                        /*上报slave的最新的同步进度信息*/
                         if (!reportSlaveMaxOffsetPlus()) {
                             return false;
                         }
@@ -597,9 +597,11 @@ public class HAService {
 
         private boolean reportSlaveMaxOffsetPlus() {
             boolean result = true;
+            /*获取slave端消息最大物理偏移量*/
             long currentPhyOffset = HAService.this.defaultMessageStore.getMaxPhyOffset();
             if (currentPhyOffset > this.currentReportedOffset) {
                 this.currentReportedOffset = currentPhyOffset;
+                /*上报*/
                 result = this.reportSlaveMaxOffset(this.currentReportedOffset);
                 if (!result) {
                     this.closeMaster();
@@ -681,6 +683,7 @@ public class HAService {
                         if (this.isTimeToReportOffset()) {
                             boolean result = this.reportSlaveMaxOffset(this.currentReportedOffset);
                             if (!result) {
+                                /*上报失败后，关闭与master的连接*/
                                 this.closeMaster();
                             }
                         }

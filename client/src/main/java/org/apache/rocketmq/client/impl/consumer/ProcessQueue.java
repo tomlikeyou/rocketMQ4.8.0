@@ -58,6 +58,7 @@ public class ProcessQueue {
      * 消息容器，key：消息偏移量，value：消息
      */
     private final TreeMap<Long, MessageExt> consumingMsgOrderlyTreeMap = new TreeMap<Long, MessageExt>();
+    /*未解锁次数统计*/
     private final AtomicLong tryUnlockTimes = new AtomicLong(0);
     private volatile long queueOffsetMax = 0L;
     private volatile boolean dropped = false;
@@ -67,7 +68,7 @@ public class ProcessQueue {
     private volatile long lastConsumeTimestamp = System.currentTimeMillis();
     /*锁定状态，该消息队列在broker端的分布式锁，顺序消费使用，分配给消费者新的消息队列时，需要从broker端获取该消息队列的分布式锁，才会进行后续拉消息、处理消息业务*/
     private volatile boolean locked = false;
-    /*上次获取锁时机*/
+    /*上次获取锁时间*/
     private volatile long lastLockTimestamp = System.currentTimeMillis();
     /*是否消费中,顺序消费使用，判断消费者本地该消息队列是否有一个顺序消费任务*/
     private volatile boolean consuming = false;

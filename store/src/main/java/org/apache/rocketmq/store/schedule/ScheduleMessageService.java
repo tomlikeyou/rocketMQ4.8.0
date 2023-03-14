@@ -81,6 +81,11 @@ public class ScheduleMessageService extends ConfigManager {
         return queueId + 1;
     }
 
+    /**
+     * 计算延迟消费队列ID :延迟级别-1
+     * @param delayLevel    延迟级别
+     * @return
+     */
     public static int delayLevel2QueueId(final int delayLevel) {
         return delayLevel - 1;
     }
@@ -147,7 +152,7 @@ public class ScheduleMessageService extends ConfigManager {
                 }
             }
 
-            /*提交周期执行的任务，“持久化延迟队列消费进度任务”，延迟10秒后执行，每10秒钟执行一次*/
+            /*提交周期执行的任务，“持久化延迟消费队列的消费进度”，延迟10秒后执行，每10秒钟执行一次*/
             this.timer.scheduleAtFixedRate(new TimerTask() {
 
                 @Override
@@ -299,7 +304,7 @@ public class ScheduleMessageService extends ConfigManager {
         }
 
         public void executeOnTimeup() {
-            /*获取出该延迟队列任务处理的延迟队列 ConsumeQueue 指定延迟主题 queueId（延迟级别-1）
+            /*获取出该延迟队列任务处理的延迟队列 ConsumeQueue 指定延迟主题 队列ID（延迟级别-1）
             * 参数1：延迟主题：SCHEDULE_TOPIC_XXXX
             * 参数2：延迟级别对应的延迟消费队列ID
             * */

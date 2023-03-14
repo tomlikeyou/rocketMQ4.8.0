@@ -1037,6 +1037,7 @@ public class DefaultMessageStore implements MessageStore {
 
         boolean result = this.commitLog.appendData(startOffset, data);
         if (result) {
+            /*唤醒消息分发服务，将消息同步保存到消费队列、索引文件内*/
             this.reputMessageService.wakeup();
         } else {
             log.error("appendToPhyQueue failed " + startOffset + " " + data.length);

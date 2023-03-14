@@ -27,7 +27,7 @@ public class LockBatchRequestBody extends RemotingSerializable {
     private String consumerGroup;
     /*客户端id*/
     private String clientId;
-    /*消息队列集合*/
+    /*请求加锁的消息队列集合*/
     private Set<MessageQueue> mqSet = new HashSet<MessageQueue>();
 
     public String getConsumerGroup() {
